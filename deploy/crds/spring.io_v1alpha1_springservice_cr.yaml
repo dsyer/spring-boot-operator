@@ -1,7 +1,0 @@
-apiVersion: spring.io/v1alpha1
-kind: SpringService
-metadata:
-  name: example-springservice
-spec:
-  # Add fields here
-  size: 3

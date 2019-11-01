@@ -67,3 +67,20 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
+
+# download kubebuilder
+RUN os=$(go env GOOS) && arch=$(go env GOARCH) && \
+    curl -sL https://go.kubebuilder.io/dl/2.0.1/${os}/${arch} | tar -xz -C /tmp/ \
+    && mv /tmp/kubebuilder_2.0.1_${os}_${arch} /usr/local/kubebuilder
+
+ENV PATH /usr/local/kubebuilder/bin:$PATH
+
+# download kustomize
+RUN opsys=linux && curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases |\
+  grep browser_download |\
+  grep $opsys |\
+  cut -d '"' -f 4 |\
+  grep /kustomize/v |\
+  sort | tail -n 1 |\
+  xargs curl -O -L \
+  && tar xzf ./kustomize_v*_${opsys}_amd64.tar.gz && mv kustomize /usr/local/bin

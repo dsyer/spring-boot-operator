@@ -15,6 +15,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
+ARG DOCKER_GID=129
 
 # Configure apt, install packages and tools
 RUN apt-get update \
@@ -83,4 +84,21 @@ RUN opsys=linux && curl -s https://api.github.com/repos/kubernetes-sigs/kustomiz
   grep /kustomize/v |\
   sort | tail -n 1 |\
   xargs curl -O -L \
-  && tar xzf ./kustomize_v*_${opsys}_amd64.tar.gz && mv kustomize /usr/local/bin
+  && tar xzf ./kustomize_v*_${opsys}_amd64.tar.gz && mv kustomize /usr/local/bin \
+  && rm -rf ./kustomize_v*
+
+# Install Docker CE CLI
+RUN apt-get update \
+    && apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common lsb-release \
+    && curl -fsSL https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]')/gpg | apt-key add - 2>/dev/null \
+    && add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') $(lsb_release -cs) stable" \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli \
+    && curl -sSL "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose \
+    && chmod +x /usr/local/bin/docker-compose \
+    # Clean up
+    && apt-get autoremove -y \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid $DOCKER_GID docker \
+    && usermod -aG docker $USERNAME

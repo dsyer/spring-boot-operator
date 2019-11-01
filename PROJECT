@@ -1,3 +1,7 @@
 version: "2"
 domain: spring.io
 repo: github.com/dsyer/sample-controller
+resources:
+- group: webapp
+  version: v1
+  kind: Spring

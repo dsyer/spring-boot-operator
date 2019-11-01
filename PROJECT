@@ -1,0 +1,3 @@
+version: "2"
+domain: spring.io
+repo: github.com/dsyer/sample-controller

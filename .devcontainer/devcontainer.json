@@ -11,7 +11,9 @@
 
 		"--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined",
 
-		"-v","/var/run/docker.sock:/var/run/docker.sock"
+		"-v","/var/run/docker.sock:/var/run/docker.sock",
+		"--mount", "type=bind,source=${env:HOME}/.kube,target=/home/vscode/.kube",
+		"-e", "KUBECONFIG=/home/vscode/.kube/kind-config-internal"
 	],
 
 	// Use 'settings' to set *default* container specific settings.json values on container create. 

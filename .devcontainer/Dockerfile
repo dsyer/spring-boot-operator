@@ -102,3 +102,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid $DOCKER_GID docker \
     && usermod -aG docker $USERNAME
+
+RUN curl -sSL -o /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl \
+    && chmod +x /usr/local/bin/kubectl

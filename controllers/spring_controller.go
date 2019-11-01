@@ -34,15 +34,18 @@ type SpringReconciler struct {
 // +kubebuilder:rbac:groups=webapp.spring.io,resources=springs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=webapp.spring.io,resources=springs/status,verbs=get;update;patch
 
+// Reconcile Business logic for controller
 func (r *SpringReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("spring", req.NamespacedName)
 
 	// your logic here
+	// client.IgnoreNotFound()
 
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager Utility method to set up manager
 func (r *SpringReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&webappv1.Spring{}).

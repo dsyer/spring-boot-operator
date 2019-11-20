@@ -53,12 +53,13 @@ func (r *SpringReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues("spring", req.NamespacedName)
 
-	// your logic here
-	// client.IgnoreNotFound()
 	var spring webappv1.Spring
 	if err := r.Get(ctx, req.NamespacedName, &spring); err != nil {
-		log.Error(err, "Unable to fetch Spring")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		err = client.IgnoreNotFound(err)
+		if err != nil {
+			log.Error(err, "Unable to fetch Spring")
+		}
+		return ctrl.Result{}, err
 	}
 	log.Info("Updating", "resource", spring)
 
@@ -108,6 +109,7 @@ func (r *SpringReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		deployment = &deployments.Items[0]
 	}
 
+	// TODO: What if the service or deployment doesn't match our spec? Recreate?
 	spring.Status.ServiceName = service.GetName()
 	spring.Status.Label = spring.Name
 	spring.Status.Running = deployment.Status.AvailableReplicas > 0
@@ -146,11 +148,10 @@ func (r *SpringReconciler) constructService(spring *webappv1.Spring) (*core.Serv
 }
 
 func (r *SpringReconciler) constructDeployment(spring *webappv1.Spring) (*apps.Deployment, error) {
-	namePrefix := fmt.Sprintf("%s-", spring.Name)
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       map[string]string{"app": spring.Name},
-			GenerateName: namePrefix,
+			Name: spring.Name,
 			Namespace:    spring.Namespace,
 		},
 		Spec: apps.DeploymentSpec{

@@ -6,6 +6,15 @@ metadata:
   creationTimestamp: null
   name: springs.webapp.spring.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.image
+    description: image label
+    name: Image
+    type: string
+  - JSONPath: .status.running
+    description: deployment status
+    name: Running
+    type: boolean
   group: webapp.spring.io
   names:
     kind: Spring
@@ -13,6 +22,8 @@ spec:
     plural: springs
     singular: spring
   scope: ""
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: Spring is the Schema for the springs API
@@ -37,6 +48,13 @@ spec:
           type: object
         status:
           description: SpringStatus defines the observed state of Spring
+          properties:
+            label:
+              type: string
+            running:
+              type: boolean
+            serviceName:
+              type: string
           type: object
       type: object
   version: v1

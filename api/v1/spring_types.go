@@ -19,13 +19,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// SpringSpec defines the desired state of Spring
-type SpringSpec struct {
+// SpringApplicationSpec defines the desired state of SpringApplication
+type SpringApplicationSpec struct {
 	Image string `json:"image,omitempty"`
 }
 
-// SpringStatus defines the observed state of Spring
-type SpringStatus struct {
+// SpringApplicationStatus defines the observed state of SpringApplication
+type SpringApplicationStatus struct {
 	ServiceName string `json:"serviceName,omitempty"`
 	Label       string `json:"label,omitempty"`
 	Running     bool   `json:"running,omitempty"`
@@ -33,27 +33,27 @@ type SpringStatus struct {
 
 // +kubebuilder:object:root=true
 
-// Spring is the Schema for the springs API
+// SpringApplication is the Schema for the springs API
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image",description="image label"
 // +kubebuilder:printcolumn:name="Running",type="boolean",JSONPath=".status.running",description="deployment status"
-type Spring struct {
+type SpringApplication struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SpringSpec   `json:"spec,omitempty"`
-	Status SpringStatus `json:"status,omitempty"`
+	Spec   SpringApplicationSpec   `json:"spec,omitempty"`
+	Status SpringApplicationStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// SpringList contains a list of Spring
-type SpringList struct {
+// SpringApplicationList contains a list of Spring
+type SpringApplicationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Spring `json:"items"`
+	Items           []SpringApplication `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Spring{}, &SpringList{})
+	SchemeBuilder.Register(&SpringApplication{}, &SpringApplicationList{})
 }

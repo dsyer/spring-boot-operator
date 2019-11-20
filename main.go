@@ -19,7 +19,7 @@ import (
 	"flag"
 	"os"
 
-	webappv1 "github.com/dsyer/sample-controller/api/v1"
+	api "github.com/dsyer/sample-controller/api/v1"
 	"github.com/dsyer/sample-controller/controllers"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -39,7 +39,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = webappv1.AddToScheme(scheme)
+	_ = api.AddToScheme(scheme)
 	_ = core.AddToScheme(scheme)
 	_ = apps.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
@@ -66,12 +66,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.SpringReconciler{
+	if err = (&controllers.SpringApplicationReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Spring"),
+		Log:    ctrl.Log.WithName("controllers").WithName("SpringApplication"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Spring")
+		setupLog.Error(err, "unable to create controller", "controller", "SpringApplication")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

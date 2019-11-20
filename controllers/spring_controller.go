@@ -17,7 +17,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
@@ -28,32 +27,32 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	webappv1 "github.com/dsyer/sample-controller/api/v1"
+	api "github.com/dsyer/sample-controller/api/v1"
 )
 
-// SpringReconciler reconciles a Spring object
-type SpringReconciler struct {
+// SpringApplicationReconciler reconciles a SpringApplication object
+type SpringApplicationReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=webapp.spring.io,resources=springs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=webapp.spring.io,resources=springs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=spring.io,resources=springs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=spring.io,resources=springs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
 var (
 	ownerKey = ".metadata.controller"
-	apiGVStr = webappv1.GroupVersion.String()
+	apiGVStr = api.GroupVersion.String()
 )
 
 // Reconcile Business logic for controller
-func (r *SpringReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *SpringApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues("spring", req.NamespacedName)
 
-	var spring webappv1.Spring
+	var spring api.SpringApplication
 	if err := r.Get(ctx, req.NamespacedName, &spring); err != nil {
 		err = client.IgnoreNotFound(err)
 		if err != nil {
@@ -122,7 +121,7 @@ func (r *SpringReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *SpringReconciler) constructService(spring *webappv1.Spring) (*core.Service, error) {
+func (r *SpringApplicationReconciler) constructService(spring *api.SpringApplication) (*core.Service, error) {
 	service := &core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"app": spring.Name},
@@ -147,12 +146,12 @@ func (r *SpringReconciler) constructService(spring *webappv1.Spring) (*core.Serv
 	return service, nil
 }
 
-func (r *SpringReconciler) constructDeployment(spring *webappv1.Spring) (*apps.Deployment, error) {
+func (r *SpringApplicationReconciler) constructDeployment(spring *api.SpringApplication) (*apps.Deployment, error) {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:       map[string]string{"app": spring.Name},
-			Name: spring.Name,
-			Namespace:    spring.Namespace,
+			Labels:    map[string]string{"app": spring.Name},
+			Name:      spring.Name,
+			Namespace: spring.Namespace,
 		},
 		Spec: apps.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -180,7 +179,7 @@ func (r *SpringReconciler) constructDeployment(spring *webappv1.Spring) (*apps.D
 }
 
 // SetupWithManager Utility method to set up manager
-func (r *SpringReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *SpringApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(&apps.Deployment{}, ownerKey, func(rawObj runtime.Object) []string {
 		// grab the job object, extract the owner...
 		deployment := rawObj.(*apps.Deployment)
@@ -189,7 +188,7 @@ func (r *SpringReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return nil
 		}
 		// ...make sure it's ours...
-		if owner.APIVersion != apiGVStr || owner.Kind != "Spring" {
+		if owner.APIVersion != apiGVStr || owner.Kind != "SpringApplication" {
 			return nil
 		}
 
@@ -206,7 +205,7 @@ func (r *SpringReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return nil
 		}
 		// ...make sure it's ours...
-		if owner.APIVersion != apiGVStr || owner.Kind != "Spring" {
+		if owner.APIVersion != apiGVStr || owner.Kind != "SpringApplication" {
 			return nil
 		}
 
@@ -216,7 +215,7 @@ func (r *SpringReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&webappv1.Spring{}).
+		For(&api.SpringApplication{}).
 		Owns(&core.Service{}).
 		Owns(&apps.Deployment{}).
 		Complete(r)

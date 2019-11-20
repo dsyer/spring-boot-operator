@@ -1,7 +1,6 @@
-apiVersion: webapp.spring.io/v1
-kind: Spring
+apiVersion: spring.io/v1
+kind: SpringApplication
 metadata:
   name: spring-sample
 spec:
-  # Add fields here
   image: springguides/demo

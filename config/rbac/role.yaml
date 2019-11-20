@@ -31,9 +31,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - webapp.spring.io
+  - spring.io
   resources:
-  - springs
+  - springapplications
   verbs:
   - create
   - delete
@@ -43,9 +43,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - webapp.spring.io
+  - spring.io
   resources:
-  - springs/status
+  - springapplications/status
   verbs:
   - get
   - patch

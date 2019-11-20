@@ -31,7 +31,7 @@ install: manifests
 
 # Uninstall CRDs and RBACs from a cluster
 uninstall:
-	kustomize build config/default | kubectl delete -f -
+	- kustomize build config/default | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests

@@ -161,21 +161,37 @@ func (r *SpringApplicationReconciler) constructDeployment(spring *api.SpringAppl
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"app": spring.Name},
 				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{
-						core.Container{
-							Name:  "app",
-							Image: spring.Spec.Image,
-						},
-					},
-				},
 			},
 		},
+	}
+	spring.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
+	container := findAppContainer(deployment.Spec.Template.Spec)
+	if container == nil {
+		container = &core.Container{
+			Name:  "app",
+			Image: spring.Spec.Image,
+		}
+		deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, *container)
+	} else {
+		container.Name = "app"
+		container.Image = spring.Spec.Image
 	}
 	if err := ctrl.SetControllerReference(spring, deployment, r.Scheme); err != nil {
 		return nil, err
 	}
 	return deployment, nil
+}
+
+func findAppContainer(pod core.PodSpec) *core.Container {
+	if len(pod.Containers) == 1 {
+		return &pod.Containers[0]
+	}
+	for _, container := range pod.Containers {
+		if container.Name == "app" {
+			return &container
+		}
+	}
+	return nil
 }
 
 // SetupWithManager Utility method to set up manager

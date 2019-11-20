@@ -33,7 +33,7 @@ rules:
 - apiGroups:
   - spring.io
   resources:
-  - springapplications
+  - springs
   verbs:
   - create
   - delete
@@ -45,7 +45,7 @@ rules:
 - apiGroups:
   - spring.io
   resources:
-  - springapplications/status
+  - springs/status
   verbs:
   - get
   - patch

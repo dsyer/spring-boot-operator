@@ -1,6 +1,6 @@
 apiVersion: spring.io/v1
 kind: SpringApplication
 metadata:
-  name: spring-sample
+  name: demo
 spec:
   image: springguides/demo

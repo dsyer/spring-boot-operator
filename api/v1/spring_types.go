@@ -16,12 +16,14 @@ limitations under the License.
 package v1
 
 import (
+	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // SpringApplicationSpec defines the desired state of SpringApplication
 type SpringApplicationSpec struct {
-	Image string `json:"image,omitempty"`
+	Image string       `json:"image,omitempty"`
+	Pod   core.PodSpec `json:"pod,omitempty"`
 }
 
 // SpringApplicationStatus defines the observed state of SpringApplication

@@ -4,4 +4,4 @@ metadata:
   name: spring-sample
 spec:
   # Add fields here
-  foo: bar
+  image: springguides/demo

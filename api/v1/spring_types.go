@@ -21,7 +21,7 @@ import (
 
 // SpringSpec defines the desired state of Spring
 type SpringSpec struct {
-	Foo string `json:"foo,omitempty"`
+	Image string `json:"image,omitempty"`
 }
 
 // SpringStatus defines the observed state of Spring

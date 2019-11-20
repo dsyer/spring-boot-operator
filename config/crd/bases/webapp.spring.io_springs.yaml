@@ -32,7 +32,7 @@ spec:
         spec:
           description: SpringSpec defines the desired state of Spring
           properties:
-            foo:
+            image:
               type: string
           type: object
         status:

@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: dsyer/sample-controller
-  newTag: latest
+  newTag: last

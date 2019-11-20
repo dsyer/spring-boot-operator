@@ -4,4 +4,4 @@ repo: github.com/dsyer/sample-controller
 resources:
 - group: spring.io
   version: v1
-  kind: SpringApplication
+  kind: Microservice

@@ -66,12 +66,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.SpringApplicationReconciler{
+	if err = (&controllers.MicroserviceReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("SpringApplication"),
+		Log:    ctrl.Log.WithName("controllers").WithName("Microservice"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SpringApplication")
+		setupLog.Error(err, "unable to create controller", "controller", "Microservice")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

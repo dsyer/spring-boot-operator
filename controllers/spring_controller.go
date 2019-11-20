@@ -30,8 +30,8 @@ import (
 	api "github.com/dsyer/sample-controller/api/v1"
 )
 
-// SpringApplicationReconciler reconciles a SpringApplication object
-type SpringApplicationReconciler struct {
+// MicroserviceReconciler reconciles a Microservice object
+type MicroserviceReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
@@ -48,11 +48,11 @@ var (
 )
 
 // Reconcile Business logic for controller
-func (r *SpringApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues("spring", req.NamespacedName)
 
-	var spring api.SpringApplication
+	var spring api.Microservice
 	if err := r.Get(ctx, req.NamespacedName, &spring); err != nil {
 		err = client.IgnoreNotFound(err)
 		if err != nil {
@@ -121,7 +121,7 @@ func (r *SpringApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 	return ctrl.Result{}, nil
 }
 
-func (r *SpringApplicationReconciler) constructService(spring *api.SpringApplication) (*core.Service, error) {
+func (r *MicroserviceReconciler) constructService(spring *api.Microservice) (*core.Service, error) {
 	service := &core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"app": spring.Name},
@@ -146,7 +146,7 @@ func (r *SpringApplicationReconciler) constructService(spring *api.SpringApplica
 	return service, nil
 }
 
-func (r *SpringApplicationReconciler) constructDeployment(spring *api.SpringApplication) (*apps.Deployment, error) {
+func (r *MicroserviceReconciler) constructDeployment(spring *api.Microservice) (*apps.Deployment, error) {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"app": spring.Name},
@@ -222,7 +222,7 @@ func findAppContainer(pod core.PodSpec) *core.Container {
 }
 
 // SetupWithManager Utility method to set up manager
-func (r *SpringApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(&apps.Deployment{}, ownerKey, func(rawObj runtime.Object) []string {
 		// grab the job object, extract the owner...
 		deployment := rawObj.(*apps.Deployment)
@@ -231,7 +231,7 @@ func (r *SpringApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return nil
 		}
 		// ...make sure it's ours...
-		if owner.APIVersion != apiGVStr || owner.Kind != "SpringApplication" {
+		if owner.APIVersion != apiGVStr || owner.Kind != "Microservice" {
 			return nil
 		}
 
@@ -248,7 +248,7 @@ func (r *SpringApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return nil
 		}
 		// ...make sure it's ours...
-		if owner.APIVersion != apiGVStr || owner.Kind != "SpringApplication" {
+		if owner.APIVersion != apiGVStr || owner.Kind != "Microservice" {
 			return nil
 		}
 
@@ -258,7 +258,7 @@ func (r *SpringApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&api.SpringApplication{}).
+		For(&api.Microservice{}).
 		Owns(&core.Service{}).
 		Owns(&apps.Deployment{}).
 		Complete(r)

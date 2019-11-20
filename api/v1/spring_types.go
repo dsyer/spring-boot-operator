@@ -20,15 +20,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// SpringApplicationSpec defines the desired state of SpringApplication
-type SpringApplicationSpec struct {
+// MicroserviceSpec defines the desired state of Microservice
+type MicroserviceSpec struct {
 	Image     string       `json:"image,omitempty"`
 	Actuators bool         `json:"actuators,omitempty"`
 	Pod       core.PodSpec `json:"pod,omitempty"`
 }
 
-// SpringApplicationStatus defines the observed state of SpringApplication
-type SpringApplicationStatus struct {
+// MicroserviceStatus defines the observed state of Microservice
+type MicroserviceStatus struct {
 	ServiceName string `json:"serviceName,omitempty"`
 	Label       string `json:"label,omitempty"`
 	Running     bool   `json:"running,omitempty"`
@@ -36,27 +36,27 @@ type SpringApplicationStatus struct {
 
 // +kubebuilder:object:root=true
 
-// SpringApplication is the Schema for the springs API
+// Microservice is the Schema for the springs API
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image",description="image label"
 // +kubebuilder:printcolumn:name="Running",type="boolean",JSONPath=".status.running",description="deployment status"
-type SpringApplication struct {
+type Microservice struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SpringApplicationSpec   `json:"spec,omitempty"`
-	Status SpringApplicationStatus `json:"status,omitempty"`
+	Spec   MicroserviceSpec   `json:"spec,omitempty"`
+	Status MicroserviceStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// SpringApplicationList contains a list of Spring
-type SpringApplicationList struct {
+// MicroserviceList contains a list of Spring
+type MicroserviceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SpringApplication `json:"items"`
+	Items           []Microservice `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&SpringApplication{}, &SpringApplicationList{})
+	SchemeBuilder.Register(&Microservice{}, &MicroserviceList{})
 }

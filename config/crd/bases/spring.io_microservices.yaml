@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  name: springapplications.spring.io
+  name: microservices.spring.io
 spec:
   additionalPrinterColumns:
   - JSONPath: .spec.image
@@ -17,16 +17,16 @@ spec:
     type: boolean
   group: spring.io
   names:
-    kind: SpringApplication
-    listKind: SpringApplicationList
-    plural: springapplications
-    singular: springapplication
+    kind: Microservice
+    listKind: MicroserviceList
+    plural: microservices
+    singular: microservice
   scope: ""
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: SpringApplication is the Schema for the springs API
+      description: Microservice is the Schema for the springs API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -41,7 +41,7 @@ spec:
         metadata:
           type: object
         spec:
-          description: SpringApplicationSpec defines the desired state of SpringApplication
+          description: MicroserviceSpec defines the desired state of Microservice
           properties:
             actuators:
               type: boolean
@@ -4016,7 +4016,7 @@ spec:
               type: object
           type: object
         status:
-          description: SpringApplicationStatus defines the observed state of SpringApplication
+          description: MicroserviceStatus defines the observed state of Microservice
           properties:
             label:
               type: string

@@ -176,6 +176,33 @@ func (r *SpringApplicationReconciler) constructDeployment(spring *api.SpringAppl
 		container.Name = "app"
 		container.Image = spring.Spec.Image
 	}
+	if spring.Spec.Actuators {
+		if container.LivenessProbe == nil {
+			container.LivenessProbe = &core.Probe{
+				Handler: core.Handler{
+					HTTPGet: &core.HTTPGetAction{
+						Path: "/actuator/health",
+						Port: intstr.FromInt(8080),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       3,
+			}
+		}
+		if container.ReadinessProbe == nil {
+			container.ReadinessProbe = &core.Probe{
+				Handler: core.Handler{
+					HTTPGet: &core.HTTPGetAction{
+						Path: "/actuator/info",
+						Port: intstr.FromInt(8080),
+					},
+				},
+				InitialDelaySeconds: 20,
+				PeriodSeconds:       10,
+			}
+		}
+	}
+	r.Log.Info("Deploying", "deployment", deployment)
 	if err := ctrl.SetControllerReference(spring, deployment, r.Scheme); err != nil {
 		return nil, err
 	}

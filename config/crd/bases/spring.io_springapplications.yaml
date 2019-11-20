@@ -43,6 +43,8 @@ spec:
         spec:
           description: SpringApplicationSpec defines the desired state of SpringApplication
           properties:
+            actuators:
+              type: boolean
             image:
               type: string
             pod:

@@ -1,0 +1,7 @@
+apiVersion: spring.io/v1
+kind: SpringApplication
+metadata:
+  name: actr
+spec:
+  image: springguides/demo
+  actuators: true

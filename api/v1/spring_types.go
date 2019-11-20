@@ -22,8 +22,9 @@ import (
 
 // SpringApplicationSpec defines the desired state of SpringApplication
 type SpringApplicationSpec struct {
-	Image string       `json:"image,omitempty"`
-	Pod   core.PodSpec `json:"pod,omitempty"`
+	Image     string       `json:"image,omitempty"`
+	Actuators bool         `json:"actuators,omitempty"`
+	Pod       core.PodSpec `json:"pod,omitempty"`
 }
 
 // SpringApplicationStatus defines the observed state of SpringApplication

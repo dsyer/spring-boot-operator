@@ -165,17 +165,19 @@ func (r *MicroserviceReconciler) constructDeployment(spring *api.Microservice) (
 		},
 	}
 	spring.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
-	container := findAppContainer(deployment.Spec.Template.Spec)
-	if container == nil {
-		container = &core.Container{
-			Name:  "app",
-			Image: spring.Spec.Image,
-		}
-		deployment.Spec.Template.Spec.Containers = append(deployment.Spec.Template.Spec.Containers, *container)
-	} else {
-		container.Name = "app"
-		container.Image = spring.Spec.Image
+	container := findAppContainer(&deployment.Spec.Template.Spec)
+	setUpAppContainer(container, *spring)
+	r.Log.Info("Deploying", "deployment", deployment)
+	if err := ctrl.SetControllerReference(spring, deployment, r.Scheme); err != nil {
+		return nil, err
 	}
+	return deployment, nil
+}
+
+// Set up the app container, setting the image, adding probes etc.
+func setUpAppContainer(container *core.Container, spring api.Microservice) {
+	container.Name = "app"
+	container.Image = spring.Spec.Image
 	if spring.Spec.Actuators {
 		if container.LivenessProbe == nil {
 			container.LivenessProbe = &core.Probe{
@@ -202,23 +204,29 @@ func (r *MicroserviceReconciler) constructDeployment(spring *api.Microservice) (
 			}
 		}
 	}
-	r.Log.Info("Deploying", "deployment", deployment)
-	if err := ctrl.SetControllerReference(spring, deployment, r.Scheme); err != nil {
-		return nil, err
-	}
-	return deployment, nil
+
 }
 
-func findAppContainer(pod core.PodSpec) *core.Container {
+// Find the container that runs the app image
+func findAppContainer(pod *core.PodSpec) *core.Container {
+	var container *core.Container
 	if len(pod.Containers) == 1 {
-		return &pod.Containers[0]
+		container = &pod.Containers[0]
 	}
-	for _, container := range pod.Containers {
+	for _, candidate := range pod.Containers {
 		if container.Name == "app" {
-			return &container
+			container = &candidate
+			break
 		}
 	}
-	return nil
+	if container == nil {
+		container = &core.Container{
+			Name: "app",
+		}
+		pod.Containers = append(pod.Containers, *container)
+		container = &pod.Containers[len(pod.Containers)-1]
+	}
+	return container
 }
 
 // SetupWithManager Utility method to set up manager

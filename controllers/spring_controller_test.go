@@ -17,14 +17,14 @@ package controllers
 
 import (
 	api "github.com/dsyer/sample-controller/api/v1"
-	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 )
 
 func TestCreateService(t *testing.T) {
 	micro := api.Microservice{
-		ObjectMeta: meta.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "demo",
 			Namespace: "test",
 		},
@@ -42,6 +42,9 @@ func TestCreateService(t *testing.T) {
 	if service.Labels["app"] != "demo" {
 		t.Errorf("Service.Labels['app'] = %s; want 'demo'", service.Labels["app"])
 	}
+	if service.Spec.Selector["app"] != "demo" {
+		t.Errorf("Service.Spec.Selector['app'] = %s; want 'demo'", service.Spec.Selector["app"])
+	}
 	if len(service.Spec.Ports) != 1 {
 		t.Errorf("len(Service.Spec.Ports) = %d; want 1", len(service.Spec.Ports))
 	}
@@ -56,7 +59,7 @@ func TestCreateService(t *testing.T) {
 
 func TestCreateDeploymentVanilla(t *testing.T) {
 	micro := api.Microservice{
-		ObjectMeta: meta.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "demo",
 			Namespace: "test",
 		},
@@ -86,7 +89,7 @@ func TestCreateDeploymentVanilla(t *testing.T) {
 
 func TestCreateDeploymentActuators(t *testing.T) {
 	micro := api.Microservice{
-		ObjectMeta: meta.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "demo",
 			Namespace: "test",
 		},
@@ -108,17 +111,17 @@ func TestCreateDeploymentActuators(t *testing.T) {
 
 func TestCreateDeploymentExistingContainer(t *testing.T) {
 	micro := api.Microservice{
-		ObjectMeta: meta.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "demo",
 			Namespace: "test",
 		},
 		Spec: api.MicroserviceSpec{
 			Image: "springguides/demo",
-			Pod: core.PodSpec{
-				Containers: []core.Container{
-					core.Container{
-						Env: []core.EnvVar{
-							core.EnvVar{
+			Pod: corev1.PodSpec{
+				Containers: []corev1.Container{
+					corev1.Container{
+						Env: []corev1.EnvVar{
+							corev1.EnvVar{
 								Name:  "FOO",
 								Value: "BAR",
 							},

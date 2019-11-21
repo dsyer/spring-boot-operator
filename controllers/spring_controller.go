@@ -20,7 +20,7 @@ import (
 
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -62,7 +62,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	log.Info("Updating", "resource", micro)
 
-	var services core.ServiceList
+	var services corev1.ServiceList
 	var deployments apps.DeploymentList
 	if err := r.List(ctx, &services, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
 		log.Error(err, "Unable to list child Services")
@@ -73,7 +73,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, err
 	}
 
-	var service *core.Service
+	var service *corev1.Service
 	var deployment *apps.Deployment
 
 	log.Info("Found services", "services", len(services.Items))
@@ -122,16 +122,16 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	return ctrl.Result{}, nil
 }
 
-func createService(micro *api.Microservice) *core.Service {
-	service := &core.Service{
+func createService(micro *api.Microservice) *corev1.Service {
+	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"app": micro.Name},
 			Name:      micro.Name,
 			Namespace: micro.Namespace,
 		},
-		Spec: core.ServiceSpec{
-			Ports: []core.ServicePort{
-				core.ServicePort{
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				corev1.ServicePort{
 					Protocol:   "TCP",
 					Port:       80,
 					TargetPort: intstr.FromInt(8080),
@@ -144,7 +144,7 @@ func createService(micro *api.Microservice) *core.Service {
 	return service
 }
 
-func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*core.Service, error) {
+func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*corev1.Service, error) {
 	service := createService(micro)
 	if err := ctrl.SetControllerReference(micro, service, r.Scheme); err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func createDeployment(micro *api.Microservice) *apps.Deployment {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": micro.Name},
 			},
-			Template: core.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"app": micro.Name},
 				},
@@ -187,14 +187,14 @@ func (r *MicroserviceReconciler) constructDeployment(micro *api.Microservice) (*
 }
 
 // Set up the app container, setting the image, adding probes etc.
-func setUpAppContainer(container *core.Container, micro api.Microservice) {
+func setUpAppContainer(container *corev1.Container, micro api.Microservice) {
 	container.Name = "app"
 	container.Image = micro.Spec.Image
 	if micro.Spec.Actuators {
 		if container.LivenessProbe == nil {
-			container.LivenessProbe = &core.Probe{
-				Handler: core.Handler{
-					HTTPGet: &core.HTTPGetAction{
+			container.LivenessProbe = &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/actuator/health",
 						Port: intstr.FromInt(8080),
 					},
@@ -204,9 +204,9 @@ func setUpAppContainer(container *core.Container, micro api.Microservice) {
 			}
 		}
 		if container.ReadinessProbe == nil {
-			container.ReadinessProbe = &core.Probe{
-				Handler: core.Handler{
-					HTTPGet: &core.HTTPGetAction{
+			container.ReadinessProbe = &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/actuator/info",
 						Port: intstr.FromInt(8080),
 					},
@@ -220,8 +220,8 @@ func setUpAppContainer(container *core.Container, micro api.Microservice) {
 }
 
 // Find the container that runs the app image
-func findAppContainer(pod *core.PodSpec) *core.Container {
-	var container *core.Container
+func findAppContainer(pod *corev1.PodSpec) *corev1.Container {
+	var container *corev1.Container
 	if len(pod.Containers) == 1 {
 		container = &pod.Containers[0]
 	}
@@ -232,7 +232,7 @@ func findAppContainer(pod *core.PodSpec) *core.Container {
 		}
 	}
 	if container == nil {
-		container = &core.Container{
+		container = &corev1.Container{
 			Name: "app",
 		}
 		pod.Containers = append(pod.Containers, *container)
@@ -260,9 +260,9 @@ func (r *MicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(&core.Service{}, ownerKey, func(rawObj runtime.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(&corev1.Service{}, ownerKey, func(rawObj runtime.Object) []string {
 		// grab the job object, extract the owner...
-		service := rawObj.(*core.Service)
+		service := rawObj.(*corev1.Service)
 		owner := metav1.GetControllerOf(service)
 		if owner == nil {
 			return nil
@@ -279,7 +279,7 @@ func (r *MicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Microservice{}).
-		Owns(&core.Service{}).
+		Owns(&corev1.Service{}).
 		Owns(&apps.Deployment{}).
 		Complete(r)
 }

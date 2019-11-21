@@ -37,8 +37,8 @@ type MicroserviceReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=spring.io,resources=springs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=spring.io,resources=springs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=micro.io,resources=microservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=micro.io,resources=microservices/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
@@ -50,17 +50,17 @@ var (
 // Reconcile Business logic for controller
 func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("spring", req.NamespacedName)
+	log := r.Log.WithValues("micro", req.NamespacedName)
 
-	var spring api.Microservice
-	if err := r.Get(ctx, req.NamespacedName, &spring); err != nil {
+	var micro api.Microservice
+	if err := r.Get(ctx, req.NamespacedName, &micro); err != nil {
 		err = client.IgnoreNotFound(err)
 		if err != nil {
-			log.Error(err, "Unable to fetch Spring")
+			log.Error(err, "Unable to fetch micro")
 		}
 		return ctrl.Result{}, err
 	}
-	log.Info("Updating", "resource", spring)
+	log.Info("Updating", "resource", micro)
 
 	var services core.ServiceList
 	var deployments apps.DeploymentList
@@ -79,54 +79,54 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	log.Info("Found services", "services", len(services.Items))
 	if len(services.Items) == 0 {
 		var err error
-		service, err = r.constructService(&spring)
+		service, err = r.constructService(&micro)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		if err := r.Create(ctx, service); err != nil {
-			log.Error(err, "Unable to create Service for Spring", "service", service)
+			log.Error(err, "Unable to create Service for micro", "service", service)
 			return ctrl.Result{}, err
 		}
 
-		log.Info("Created Service for Spring", "service", service)
+		log.Info("Created Service for micro", "service", service)
 	} else {
 		service = &services.Items[0]
 	}
 	if len(deployments.Items) == 0 {
 		var err error
-		deployment, err = r.constructDeployment(&spring)
+		deployment, err = r.constructDeployment(&micro)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		if err := r.Create(ctx, deployment); err != nil {
-			log.Error(err, "Unable to create Deployment for Spring", "deployment", deployment)
+			log.Error(err, "Unable to create Deployment for micro", "deployment", deployment)
 			return ctrl.Result{}, err
 		}
 
-		log.Info("Created Deployments for Spring", "deployment", deployment)
+		log.Info("Created Deployments for micro", "deployment", deployment)
 	} else {
 		deployment = &deployments.Items[0]
 	}
 
 	// TODO: What if the service or deployment doesn't match our spec? Recreate?
-	spring.Status.ServiceName = service.GetName()
-	spring.Status.Label = spring.Name
-	spring.Status.Running = deployment.Status.AvailableReplicas > 0
+	micro.Status.ServiceName = service.GetName()
+	micro.Status.Label = micro.Name
+	micro.Status.Running = deployment.Status.AvailableReplicas > 0
 
-	if err := r.Status().Update(ctx, &spring); err != nil {
-		log.Error(err, "Unable to update Spring status")
+	if err := r.Status().Update(ctx, &micro); err != nil {
+		log.Error(err, "Unable to update micro status")
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *MicroserviceReconciler) constructService(spring *api.Microservice) (*core.Service, error) {
+func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*core.Service, error) {
 	service := &core.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{"app": spring.Name},
-			Name:      spring.Name,
-			Namespace: spring.Namespace,
+			Labels:    map[string]string{"app": micro.Name},
+			Name:      micro.Name,
+			Namespace: micro.Namespace,
 		},
 		Spec: core.ServiceSpec{
 			Ports: []core.ServicePort{
@@ -137,48 +137,49 @@ func (r *MicroserviceReconciler) constructService(spring *api.Microservice) (*co
 					Name:       "http",
 				},
 			},
-			Selector: map[string]string{"app": spring.Name},
+			Selector: map[string]string{"app": micro.Name},
 		},
 	}
-	if err := ctrl.SetControllerReference(spring, service, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(micro, service, r.Scheme); err != nil {
 		return nil, err
 	}
 	return service, nil
 }
 
-func (r *MicroserviceReconciler) constructDeployment(spring *api.Microservice) (*apps.Deployment, error) {
+// Create a Deployment for the microservice application
+func (r *MicroserviceReconciler) constructDeployment(micro *api.Microservice) (*apps.Deployment, error) {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{"app": spring.Name},
-			Name:      spring.Name,
-			Namespace: spring.Namespace,
+			Labels:    map[string]string{"app": micro.Name},
+			Name:      micro.Name,
+			Namespace: micro.Namespace,
 		},
 		Spec: apps.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": spring.Name},
+				MatchLabels: map[string]string{"app": micro.Name},
 			},
 			Template: core.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": spring.Name},
+					Labels: map[string]string{"app": micro.Name},
 				},
 			},
 		},
 	}
-	spring.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
+	micro.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
 	container := findAppContainer(&deployment.Spec.Template.Spec)
-	setUpAppContainer(container, *spring)
+	setUpAppContainer(container, *micro)
 	r.Log.Info("Deploying", "deployment", deployment)
-	if err := ctrl.SetControllerReference(spring, deployment, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(micro, deployment, r.Scheme); err != nil {
 		return nil, err
 	}
 	return deployment, nil
 }
 
 // Set up the app container, setting the image, adding probes etc.
-func setUpAppContainer(container *core.Container, spring api.Microservice) {
+func setUpAppContainer(container *core.Container, micro api.Microservice) {
 	container.Name = "app"
-	container.Image = spring.Spec.Image
-	if spring.Spec.Actuators {
+	container.Image = micro.Spec.Image
+	if micro.Spec.Actuators {
 		if container.LivenessProbe == nil {
 			container.LivenessProbe = &core.Probe{
 				Handler: core.Handler{

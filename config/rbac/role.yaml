@@ -31,9 +31,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - spring.io
+  - micro.io
   resources:
-  - springs
+  - microservices
   verbs:
   - create
   - delete
@@ -43,9 +43,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - spring.io
+  - micro.io
   resources:
-  - springs/status
+  - microservices/status
   verbs:
   - get
   - patch

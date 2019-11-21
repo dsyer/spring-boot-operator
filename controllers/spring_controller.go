@@ -50,7 +50,7 @@ var (
 // Reconcile Business logic for controller
 func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("micro", req.NamespacedName)
+	log := r.Log.WithValues("microservice", req.NamespacedName)
 
 	var micro api.Microservice
 	if err := r.Get(ctx, req.NamespacedName, &micro); err != nil {
@@ -90,6 +90,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		log.Info("Created Service for micro", "service", service)
 	} else {
+		// TODO: update if changed
 		service = &services.Items[0]
 	}
 	if len(deployments.Items) == 0 {
@@ -105,10 +106,10 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		log.Info("Created Deployments for micro", "deployment", deployment)
 	} else {
+		// TODO: update if changed
 		deployment = &deployments.Items[0]
 	}
 
-	// TODO: What if the service or deployment doesn't match our spec? Recreate?
 	micro.Status.ServiceName = service.GetName()
 	micro.Status.Label = micro.Name
 	micro.Status.Running = deployment.Status.AvailableReplicas > 0
@@ -121,7 +122,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	return ctrl.Result{}, nil
 }
 
-func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*core.Service, error) {
+func createService(micro *api.Microservice) *core.Service {
 	service := &core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"app": micro.Name},
@@ -140,14 +141,18 @@ func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*cor
 			Selector: map[string]string{"app": micro.Name},
 		},
 	}
+	return service
+}
+
+func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*core.Service, error) {
+	service := createService(micro)
 	if err := ctrl.SetControllerReference(micro, service, r.Scheme); err != nil {
 		return nil, err
 	}
 	return service, nil
 }
 
-// Create a Deployment for the microservice application
-func (r *MicroserviceReconciler) constructDeployment(micro *api.Microservice) (*apps.Deployment, error) {
+func createDeployment(micro *api.Microservice) *apps.Deployment {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"app": micro.Name},
@@ -168,6 +173,12 @@ func (r *MicroserviceReconciler) constructDeployment(micro *api.Microservice) (*
 	micro.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
 	container := findAppContainer(&deployment.Spec.Template.Spec)
 	setUpAppContainer(container, *micro)
+	return deployment
+}
+
+// Create a Deployment for the microservice application
+func (r *MicroserviceReconciler) constructDeployment(micro *api.Microservice) (*apps.Deployment, error) {
+	deployment := createDeployment(micro)
 	r.Log.Info("Deploying", "deployment", deployment)
 	if err := ctrl.SetControllerReference(micro, deployment, r.Scheme); err != nil {
 		return nil, err

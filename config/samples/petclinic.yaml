@@ -13,5 +13,3 @@ spec:
       env:
       - name: MANAGEMENT_ENDPOINTS_WEB_BASEPATH
         value: /actuator
-      - name: DEBUG
-        value: "false"

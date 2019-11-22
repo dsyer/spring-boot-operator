@@ -297,3 +297,30 @@ func TestUpdateDeploymentProfiles(t *testing.T) {
 	}
 
 }
+
+func TestUpdateImage(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Image: "springguides/demo",
+		},
+	}
+	deployment := createDeployment(&micro)
+	container := deployment.Spec.Template.Spec.Containers[0]
+	if container.Image != "springguides/demo" {
+		t.Errorf("Container.Image = %s; want 'springguides/demo'", container.Image)
+	}
+	micro.Spec.Image = "springguides/demo:last"
+	updateDeployment(deployment, &micro)
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
+	}
+	container = deployment.Spec.Template.Spec.Containers[0]
+	if container.Image != "springguides/demo:last" {
+		t.Errorf("Container.Image = %s; want 'springguides/demo:last'", container.Image)
+	}
+
+}

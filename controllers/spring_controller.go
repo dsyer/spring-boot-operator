@@ -94,7 +94,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	} else {
 		// update if changed
 		service = &services.Items[0]
-		updateService(service, &micro)
+		service = updateService(service, &micro)
 		if err := r.Update(ctx, service); err != nil {
 			log.Error(err, "Unable to update Service for micro", "service", service)
 			return ctrl.Result{}, err
@@ -117,7 +117,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	} else {
 		// update if changed
 		deployment = &deployments.Items[0]
-		updateDeployment(deployment, &micro)
+		deployment = updateDeployment(deployment, &micro)
 		if err := r.Update(ctx, deployment); err != nil {
 			log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
 			return ctrl.Result{}, err

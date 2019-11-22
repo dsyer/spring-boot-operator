@@ -45,6 +45,10 @@ spec:
           properties:
             actuators:
               type: boolean
+            bindings:
+              items:
+                type: string
+              type: array
             image:
               type: string
             pod:
@@ -733,7 +737,7 @@ spec:
                                       type: string
                                     optional:
                                       description: Specify whether the ConfigMap or
-                                        it's key must be defined
+                                        its key must be defined
                                       type: boolean
                                   required:
                                   - key
@@ -791,7 +795,7 @@ spec:
                                         kind, uid?'
                                       type: string
                                     optional:
-                                      description: Specify whether the Secret or it's
+                                      description: Specify whether the Secret or its
                                         key must be defined
                                       type: boolean
                                   required:
@@ -1443,6 +1447,24 @@ spec:
                                   to the container.
                                 type: string
                             type: object
+                          windowsOptions:
+                            description: Windows security options.
+                            properties:
+                              gmsaCredentialSpec:
+                                description: GMSACredentialSpec is where the GMSA
+                                  admission webhook (https://github.com/kubernetes-sigs/windows-gmsa)
+                                  inlines the contents of the GMSA credential spec
+                                  named by the GMSACredentialSpecName field. This
+                                  field is alpha-level and is only honored by servers
+                                  that enable the WindowsGMSA feature flag.
+                                type: string
+                              gmsaCredentialSpecName:
+                                description: GMSACredentialSpecName is the name of
+                                  the GMSA credential spec to use. This field is alpha-level
+                                  and is only honored by servers that enable the WindowsGMSA
+                                  feature flag.
+                                type: string
+                            type: object
                         type: object
                       stdin:
                         description: Whether this container should allocate a buffer
@@ -1541,7 +1563,7 @@ spec:
                                 similarly to SubPath but environment variable references
                                 $(VAR_NAME) are expanded using the container's environment.
                                 Defaults to "" (volume's root). SubPathExpr and SubPath
-                                are mutually exclusive. This field is alpha in 1.14.
+                                are mutually exclusive. This field is beta in 1.15.
                               type: string
                           required:
                           - mountPath
@@ -1741,7 +1763,7 @@ spec:
                                       type: string
                                     optional:
                                       description: Specify whether the ConfigMap or
-                                        it's key must be defined
+                                        its key must be defined
                                       type: boolean
                                   required:
                                   - key
@@ -1799,7 +1821,7 @@ spec:
                                         kind, uid?'
                                       type: string
                                     optional:
-                                      description: Specify whether the Secret or it's
+                                      description: Specify whether the Secret or its
                                         key must be defined
                                       type: boolean
                                   required:
@@ -2451,6 +2473,24 @@ spec:
                                   to the container.
                                 type: string
                             type: object
+                          windowsOptions:
+                            description: Windows security options.
+                            properties:
+                              gmsaCredentialSpec:
+                                description: GMSACredentialSpec is where the GMSA
+                                  admission webhook (https://github.com/kubernetes-sigs/windows-gmsa)
+                                  inlines the contents of the GMSA credential spec
+                                  named by the GMSACredentialSpecName field. This
+                                  field is alpha-level and is only honored by servers
+                                  that enable the WindowsGMSA feature flag.
+                                type: string
+                              gmsaCredentialSpecName:
+                                description: GMSACredentialSpecName is the name of
+                                  the GMSA credential spec to use. This field is alpha-level
+                                  and is only honored by servers that enable the WindowsGMSA
+                                  feature flag.
+                                type: string
+                            type: object
                         type: object
                       stdin:
                         description: Whether this container should allocate a buffer
@@ -2549,7 +2589,7 @@ spec:
                                 similarly to SubPath but environment variable references
                                 $(VAR_NAME) are expanded using the container's environment.
                                 Defaults to "" (volume's root). SubPathExpr and SubPath
-                                are mutually exclusive. This field is alpha in 1.14.
+                                are mutually exclusive. This field is beta in 1.15.
                               type: string
                           required:
                           - mountPath
@@ -2577,6 +2617,13 @@ spec:
                     the pod to fit on a node. Selector which must match a node''s
                     labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
                   type: object
+                preemptionPolicy:
+                  description: PreemptionPolicy is the Policy for preempting pods
+                    with lower priority. One of Never, PreemptLowerPriority. Defaults
+                    to PreemptLowerPriority if unset. This field is alpha-level and
+                    is only honored by servers that enable the NonPreemptingPriority
+                    feature.
+                  type: string
                 priority:
                   description: The priority value. Various system components use this
                     field to find the priority of the pod. When Priority Admission
@@ -2622,7 +2669,7 @@ spec:
                     not be run. If unset or empty, the "legacy" RuntimeClass will
                     be used, which is an implicit class with an empty definition that
                     uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
-                    This is an alpha feature and may change in the future.'
+                    This is a beta feature as of Kubernetes v1.14.'
                   type: string
                 schedulerName:
                   description: If specified, the pod will be dispatched by specified
@@ -2720,6 +2767,24 @@ spec:
                         - value
                         type: object
                       type: array
+                    windowsOptions:
+                      description: Windows security options.
+                      properties:
+                        gmsaCredentialSpec:
+                          description: GMSACredentialSpec is where the GMSA admission
+                            webhook (https://github.com/kubernetes-sigs/windows-gmsa)
+                            inlines the contents of the GMSA credential spec named
+                            by the GMSACredentialSpecName field. This field is alpha-level
+                            and is only honored by servers that enable the WindowsGMSA
+                            feature flag.
+                          type: string
+                        gmsaCredentialSpecName:
+                          description: GMSACredentialSpecName is the name of the GMSA
+                            credential spec to use. This field is alpha-level and
+                            is only honored by servers that enable the WindowsGMSA
+                            feature flag.
+                          type: string
+                      type: object
                   type: object
                 serviceAccount:
                   description: 'DeprecatedServiceAccount is a depreciated alias for
@@ -3016,7 +3081,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                           optional:
-                            description: Specify whether the ConfigMap or it's keys
+                            description: Specify whether the ConfigMap or its keys
                               must be defined
                             type: boolean
                         type: object
@@ -3567,7 +3632,7 @@ spec:
                                       type: string
                                     optional:
                                       description: Specify whether the ConfigMap or
-                                        it's keys must be defined
+                                        its keys must be defined
                                       type: boolean
                                   type: object
                                 downwardAPI:
@@ -3936,7 +4001,7 @@ spec:
                               type: object
                             type: array
                           optional:
-                            description: Specify whether the Secret or it's keys must
+                            description: Specify whether the Secret or its keys must
                               be defined
                             type: boolean
                           secretName:
@@ -4014,6 +4079,10 @@ spec:
               required:
               - containers
               type: object
+            profiles:
+              items:
+                type: string
+              type: array
           type: object
         status:
           description: MicroserviceStatus defines the observed state of Microservice

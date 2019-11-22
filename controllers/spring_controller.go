@@ -185,8 +185,8 @@ func addProfiles(container *corev1.Container, spec api.MicroserviceSpec) {
 	env := container.Env
 	// TODO: append to existing value if already defined
 	env = append(env, corev1.EnvVar{
-		Name: "SPRING_PROFILES_ACTIVE",
-		Value: strings.Join(spec.Profiles,","),
+		Name:  "SPRING_PROFILES_ACTIVE",
+		Value: strings.Join(spec.Profiles, ","),
 	})
 	container.Env = env
 }
@@ -197,20 +197,20 @@ func addVolumeMounts(container *corev1.Container, volumes []corev1.Volume) {
 	for _, volume := range volumes {
 		location := fmt.Sprintf("/config/bindings/%s/metadata/", volume.Name)
 		mounts = append(mounts, corev1.VolumeMount{
-			Name: volume.Name,
+			Name:      volume.Name,
 			MountPath: location,
 		})
 		locations = append(locations, fmt.Sprintf("file://%s", location))
 	}
 	env := container.Env
 	env = append(env, corev1.EnvVar{
-		Name: "CNB_BINDINGS",
+		Name:  "CNB_BINDINGS",
 		Value: "/config/bindings",
 	})
 	// TODO: append to existing value if already defined
 	env = append(env, corev1.EnvVar{
-		Name: "SPRING_CONFIG_LOCATION",
-		Value: strings.Join(locations,","),
+		Name:  "SPRING_CONFIG_LOCATION",
+		Value: strings.Join(locations, ","),
 	})
 	container.Env = env
 	container.VolumeMounts = mounts
@@ -224,7 +224,8 @@ func createVolumes(spec *corev1.PodSpec, micro api.MicroserviceSpec) []corev1.Vo
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: binding,
+						// We don't want a config map with the same name as the binding
+						Name: fmt.Sprintf("%s-config", binding),
 					},
 				},
 			},
@@ -283,11 +284,12 @@ func findAppContainer(pod *corev1.PodSpec) *corev1.Container {
 	var container *corev1.Container
 	if len(pod.Containers) == 1 {
 		container = &pod.Containers[0]
-	}
-	for _, candidate := range pod.Containers {
-		if container.Name == "app" {
-			container = &candidate
-			break
+	} else {
+		for _, candidate := range pod.Containers {
+			if container.Name == "app" {
+				container = &candidate
+				break
+			}
 		}
 	}
 	if container == nil {

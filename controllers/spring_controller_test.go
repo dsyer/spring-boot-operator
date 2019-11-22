@@ -19,8 +19,8 @@ import (
 	api "github.com/dsyer/sample-controller/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 	"strings"
+	"testing"
 )
 
 func TestCreateService(t *testing.T) {
@@ -110,7 +110,7 @@ func TestCreateDeploymentActuators(t *testing.T) {
 
 }
 
-func TestCreateDeploymentExistingContainer(t *testing.T) {
+func TestCreateDeploymentExistingAnonymousContainer(t *testing.T) {
 	micro := api.Microservice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "demo",
@@ -149,6 +149,45 @@ func TestCreateDeploymentExistingContainer(t *testing.T) {
 
 }
 
+func TestCreateDeploymentExistingContainer(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Image: "springguides/demo",
+			Pod: corev1.PodSpec{
+				Containers: []corev1.Container{
+					corev1.Container{
+						Name: "app",
+						Env: []corev1.EnvVar{
+							corev1.EnvVar{
+								Name:  "FOO",
+								Value: "BAR",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	deployment := createDeployment(&micro)
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
+	}
+	container := deployment.Spec.Template.Spec.Containers[0]
+	if container.Image != "springguides/demo" {
+		t.Errorf("Container.Image = %s; want 'springguides/demo'", container.Image)
+	}
+	if container.LivenessProbe != nil {
+		t.Errorf("Container.LivenessProbe = %s; want 'nil'", container.LivenessProbe)
+	}
+	if container.Env[0].Name != "FOO" {
+		t.Errorf("Container.Env[0].Name = %s; want 'FOO'", container.Env[0].Name)
+	}
+
+}
 func TestCreateDeploymentBindings(t *testing.T) {
 	micro := api.Microservice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -176,7 +215,7 @@ func TestCreateDeploymentBindings(t *testing.T) {
 	}
 	var env corev1.EnvVar
 	for _, item := range container.Env {
-		if (item.Name == "SPRING_CONFIG_LOCATION") {
+		if item.Name == "SPRING_CONFIG_LOCATION" {
 			env = item
 			break
 		}
@@ -193,7 +232,6 @@ func TestCreateDeploymentBindings(t *testing.T) {
 
 }
 
-
 func TestCreateDeploymentProfiles(t *testing.T) {
 	micro := api.Microservice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -209,7 +247,7 @@ func TestCreateDeploymentProfiles(t *testing.T) {
 	container := deployment.Spec.Template.Spec.Containers[0]
 	var env corev1.EnvVar
 	for _, item := range container.Env {
-		if (item.Name == "SPRING_PROFILES_ACTIVE") {
+		if item.Name == "SPRING_PROFILES_ACTIVE" {
 			env = item
 			break
 		}

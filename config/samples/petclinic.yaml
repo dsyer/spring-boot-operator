@@ -1,0 +1,17 @@
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: petclinic
+spec:
+  image: dsyer/petclinic
+  actuators: true
+  bindings:
+  - mysql
+  pod:
+    containers:
+    - name: app
+      env:
+      - name: MANAGEMENT_ENDPOINTS_WEB_BASEPATH
+        value: /actuator
+      - name: DEBUG
+        value: "true"

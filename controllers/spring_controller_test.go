@@ -260,3 +260,40 @@ func TestCreateDeploymentProfiles(t *testing.T) {
 	}
 
 }
+
+func TestUpdateDeploymentProfiles(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Image: "springguides/demo",
+		},
+	}
+	deployment := createDeployment(&micro)
+	container := deployment.Spec.Template.Spec.Containers[0]
+	if len(container.Env) > 0 {
+		t.Errorf("container.Env should be empty but found %s", container.Env)
+	}
+	micro.Spec.Profiles = []string{"mysql", "redis"}
+	updateDeployment(deployment, &micro)
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
+	}
+	container = deployment.Spec.Template.Spec.Containers[0]
+	var env corev1.EnvVar
+	for _, item := range container.Env {
+		if item.Name == "SPRING_PROFILES_ACTIVE" {
+			env = item
+			break
+		}
+	}
+	if env.Name == "" {
+		t.Errorf("container.Env should contain 'SPRING_PROFILES_ACTIVE', but was %s", container.Env)
+	}
+	if env.Value != "mysql,redis" {
+		t.Errorf("SPRING_PROFILES_ACTIVE should contain 'mysql', found %s", env.Value)
+	}
+
+}

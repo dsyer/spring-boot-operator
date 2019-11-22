@@ -92,8 +92,15 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		log.Info("Created Service for micro", "service", service)
 	} else {
-		// TODO: update if changed
+		// update if changed
 		service = &services.Items[0]
+		updateService(service, &micro)
+		if err := r.Update(ctx, service); err != nil {
+			log.Error(err, "Unable to update Service for micro", "service", service)
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Updated Service for micro", "service", service)
 	}
 	if len(deployments.Items) == 0 {
 		var err error
@@ -108,8 +115,15 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		log.Info("Created Deployments for micro", "deployment", deployment)
 	} else {
-		// TODO: update if changed
+		// update if changed
 		deployment = &deployments.Items[0]
+		updateDeployment(deployment, &micro)
+		if err := r.Update(ctx, deployment); err != nil {
+			log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Updated Deployments for micro", "deployment", deployment)
 	}
 
 	micro.Status.ServiceName = service.GetName()
@@ -146,6 +160,10 @@ func createService(micro *api.Microservice) *corev1.Service {
 	return service
 }
 
+func updateService(service *corev1.Service, micro *api.Microservice) *corev1.Service {
+	return service
+}
+
 func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*corev1.Service, error) {
 	service := createService(micro)
 	if err := ctrl.SetControllerReference(micro, service, r.Scheme); err != nil {
@@ -172,6 +190,11 @@ func createDeployment(micro *api.Microservice) *apps.Deployment {
 			},
 		},
 	}
+	deployment = updateDeployment(deployment, micro)
+	return deployment
+}
+
+func updateDeployment(deployment *apps.Deployment, micro *api.Microservice) *apps.Deployment {
 	micro.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
 	container := findAppContainer(&deployment.Spec.Template.Spec)
 	setUpAppContainer(container, *micro)
@@ -182,13 +205,25 @@ func createDeployment(micro *api.Microservice) *apps.Deployment {
 }
 
 func addProfiles(container *corev1.Container, spec api.MicroserviceSpec) {
-	env := container.Env
-	// TODO: append to existing value if already defined
-	env = append(env, corev1.EnvVar{
-		Name:  "SPRING_PROFILES_ACTIVE",
-		Value: strings.Join(spec.Profiles, ","),
-	})
-	container.Env = env
+	if len(spec.Profiles) > 0 {
+		container.Env = setEnvVar(container.Env, "SPRING_PROFILES_ACTIVE", strings.Join(spec.Profiles, ","))
+	}
+}
+
+func setEnvVar(values []corev1.EnvVar, name string, value string) []corev1.EnvVar {
+	var env corev1.EnvVar
+	for _, env = range values {
+		if env.Name == name {
+			env.Value = value
+			break
+		}
+	}
+	if env.Name != name {
+		env.Name = name
+		env.Value = value
+		values = append(values, env)
+	}
+	return values
 }
 
 func addVolumeMounts(container *corev1.Container, volumes []corev1.Volume) {
@@ -202,17 +237,12 @@ func addVolumeMounts(container *corev1.Container, volumes []corev1.Volume) {
 		})
 		locations = append(locations, fmt.Sprintf("file://%s", location))
 	}
-	env := container.Env
-	env = append(env, corev1.EnvVar{
-		Name:  "CNB_BINDINGS",
-		Value: "/config/bindings",
-	})
-	// TODO: append to existing value if already defined
-	env = append(env, corev1.EnvVar{
-		Name:  "SPRING_CONFIG_LOCATION",
-		Value: strings.Join(locations, ","),
-	})
-	container.Env = env
+	if len(mounts) > 0 {
+		env := container.Env
+		env = setEnvVar(env, "CNB_BINDINGS", "/config/bindings")
+		env = setEnvVar(env, "SPRING_CONFIG_LOCATION", strings.Join(locations, ","))
+		container.Env = env
+	}
 	container.VolumeMounts = mounts
 }
 

@@ -1,0 +1,10 @@
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: env
+spec:
+  image: springguides/demo
+  bindings:
+  - mysql
+  profiles:
+  - mysql

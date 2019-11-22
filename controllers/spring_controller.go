@@ -17,6 +17,8 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
@@ -173,7 +175,64 @@ func createDeployment(micro *api.Microservice) *apps.Deployment {
 	micro.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
 	container := findAppContainer(&deployment.Spec.Template.Spec)
 	setUpAppContainer(container, *micro)
+	volumes := createVolumes(&deployment.Spec.Template.Spec, micro.Spec)
+	addVolumeMounts(container, volumes)
+	addProfiles(container, micro.Spec)
 	return deployment
+}
+
+func addProfiles(container *corev1.Container, spec api.MicroserviceSpec) {
+	env := container.Env
+	// TODO: append to existing value if already defined
+	env = append(env, corev1.EnvVar{
+		Name: "SPRING_PROFILES_ACTIVE",
+		Value: strings.Join(spec.Profiles,","),
+	})
+	container.Env = env
+}
+
+func addVolumeMounts(container *corev1.Container, volumes []corev1.Volume) {
+	mounts := container.VolumeMounts
+	locations := []string{"classpath:/"}
+	for _, volume := range volumes {
+		location := fmt.Sprintf("/config/bindings/%s/metadata/", volume.Name)
+		mounts = append(mounts, corev1.VolumeMount{
+			Name: volume.Name,
+			MountPath: location,
+		})
+		locations = append(locations, fmt.Sprintf("file://%s", location))
+	}
+	env := container.Env
+	env = append(env, corev1.EnvVar{
+		Name: "CNB_BINDINGS",
+		Value: "/config/bindings",
+	})
+	// TODO: append to existing value if already defined
+	env = append(env, corev1.EnvVar{
+		Name: "SPRING_CONFIG_LOCATION",
+		Value: strings.Join(locations,","),
+	})
+	container.Env = env
+	container.VolumeMounts = mounts
+}
+
+func createVolumes(spec *corev1.PodSpec, micro api.MicroserviceSpec) []corev1.Volume {
+	volumes := spec.Volumes
+	for _, binding := range micro.Bindings {
+		volumes = append(volumes, corev1.Volume{
+			Name: binding,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: binding,
+					},
+				},
+			},
+		})
+		// TODO: secrets
+	}
+	spec.Volumes = volumes
+	return volumes
 }
 
 // Create a Deployment for the microservice application

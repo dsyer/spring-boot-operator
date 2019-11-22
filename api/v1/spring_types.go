@@ -16,22 +16,24 @@ limitations under the License.
 package v1
 
 import (
-	core "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // MicroserviceSpec defines the desired state of Microservice
 type MicroserviceSpec struct {
-	Image     string       `json:"image,omitempty"`
-	Actuators bool         `json:"actuators,omitempty"`
-	Pod       core.PodSpec `json:"pod,omitempty"`
+	Image     string         `json:"image,omitempty"`
+	Actuators bool           `json:"actuators,omitempty"`
+	Pod       corev1.PodSpec `json:"pod,omitempty"`
+	Bindings  []string       `json:"bindings,omitempty"`
+	Profiles  []string       `json:"profiles,omitempty"`
 }
 
 // MicroserviceStatus defines the observed state of Microservice
 type MicroserviceStatus struct {
-	ServiceName string `json:"serviceName,omitempty"`
-	Label       string `json:"label,omitempty"`
-	Running     bool   `json:"running,omitempty"`
+	ServiceName string                      `json:"serviceName,omitempty"`
+	Label       string                      `json:"label,omitempty"`
+	Running     bool                        `json:"running,omitempty"`
 }
 
 // +kubebuilder:object:root=true

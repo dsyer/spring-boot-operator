@@ -22,7 +22,7 @@ import (
 	api "github.com/dsyer/sample-controller/api/v1"
 	"github.com/dsyer/sample-controller/controllers"
 	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -40,7 +40,7 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	_ = api.AddToScheme(scheme)
-	_ = core.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 	_ = apps.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }

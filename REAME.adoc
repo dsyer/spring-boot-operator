@@ -4,30 +4,7 @@ A Kubernetes operator for Spring Boot microservices. If you have a container ima
 include::config/samples/demo.yaml[]
 ```
 
-Send this to Kubernetes with `kubectl` or https://github.com/k14s/kapp[Kapp]. The `Microservice` generates a `Service` and a `Deployment`, similar to what you would get if you used `kubectl create` to generate them from your image. Example
-
-```
-$ kubectl apply -f config/samples/demo.yaml
-$ kubectl get all
-NAME                             READY   STATUS    RESTARTS   AGE
-pod/mysql-744f7b658d-zt2gx       1/1     Running   0          26h
-pod/demo-6b78fb7b85-2snj4        1/1     Running   0          62m
-
-NAME                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
-service/kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP    3d2h
-service/demo         ClusterIP   10.104.167.30    <none>        80/TCP     62m
-
-NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/demo        1/1     1            1           62m
-
-NAME                                   DESIRED   CURRENT   READY   AGE
-replicaset.apps/demo-6b78fb7b85        1         1         1       62m
-
-```
-
-There are more features, expressing opinions about how pods should be defined when Spring Boot applications are being deployed.
-
-## Installation
+== Installation
 
 The controller is in Dockerhub, so you should be able to deploy it from just the YAML:
 
@@ -52,7 +29,7 @@ NAME                                                   DESIRED   CURRENT   READY
 replicaset.apps/spring-controller-manager-79c6c95677   1         1         1       3m17s
 ```
 
-### Building from Source
+=== Building from Source
 
 If you know how to set up a GO loang development environment, and are building from source you can just do this:
 
@@ -65,7 +42,73 @@ and then the controller will register with your default cluster.
 
 The source code has a VSCode `.devcontainer` definition, so if you use the "Remote Container" extension, you should be able to run in a container. The `devcontainer.json` has comments explaining what to set up on the host (you need to have `docker` running and set up your `~/.kube/config` to talk to your cluster).
 
-## Actuators
+== Try it Out
+
+Send the sample YAML above to Kubernetes with `kubectl` or https://github.com/k14s/kapp[Kapp]:
+
+```
+$ kubectl apply -f <(curl https://raw.githubusercontent.com/dsyer/spring-boot-operator/master/config/samples/demo.yaml)
+```
+
+The `Microservice` generates a `Service` and a `Deployment`, similar to what you would get if you used `kubectl create` to generate them from your image. Example
+
+```
+$ kubectl apply -f config/samples/demo.yaml
+$ kubectl get all
+NAME                             READY   STATUS    RESTARTS   AGE
+pod/mysql-744f7b658d-zt2gx       1/1     Running   0          26h
+pod/demo-6b78fb7b85-2snj4        1/1     Running   0          62m
+
+NAME                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+service/kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP    3d2h
+service/demo         ClusterIP   10.104.167.30    <none>        80/TCP     62m
+
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/demo        1/1     1            1           62m
+
+NAME                                   DESIRED   CURRENT   READY   AGE
+replicaset.apps/demo-6b78fb7b85        1         1         1       62m
+
+```
+
+The `Service` is listening on port 80, so you can expose it locally using a port forward:
+
+```
+$ kubectl port-forward svc/demo 8080:80
+Forwarding from 127.0.0.1:8080 -> 8080
+Forwarding from [::1]:8080 -> 8080
+```
+
+and then in another terminal
+
+```
+$ curl localhost:8080/actuator | jq .
+{
+  "_links": {
+    "self": {
+      "href": "http://localhost:8080/actuator",
+      "templated": false
+    },
+    "health": {
+      "href": "http://localhost:8080/actuator/health",
+      "templated": false
+    },
+    "health-path": {
+      "href": "http://localhost:8080/actuator/health/{*path}",
+      "templated": true
+    },
+    "info": {
+      "href": "http://localhost:8080/actuator/info",
+      "templated": false
+    }
+  }
+}
+```
+
+There are more features, expressing opinions about how pods should be defined when Spring Boot applications are being deployed.
+
+
+== Actuators
 
 If your application container has Spring Boot Actuators then it probably makes sense to use them as Kubernetes probes. You can do that in one line (accepting the default configuration of liveness and readiness probes):
 
@@ -73,7 +116,7 @@ If your application container has Spring Boot Actuators then it probably makes s
 include::config/samples/actuators.yaml[]
 ```
 
-## Spring Profiles
+== Spring Profiles
 
 Spring Profiles can be activated by putting `profiles` in the `Microservice` spec (as an array). Example:
 
@@ -90,7 +133,7 @@ spec:
 
 The effect is to generate an `EnvVar` in the `Deployment` with `SPRING_PROFILES_ACTIVE=mysql`.
 
-## Bindings
+== Bindings
 
 If your namespace has backend services, like databases, which can be exposed as https://github.com/buildpack/spec/blob/master/extensions/bindings.md[CNB Bindings], then you can list them in the `Microservice` spec. Example:
 
@@ -124,7 +167,7 @@ spring.datasource.password=test
 
 so a Spring Boot application with `mysql-connector` will automatically connect because it matches the default naming conventions in `spring-boot-autoconfigure`.
 
-## Pod Specs
+== Pod Specs
 
 The `PodSpec` in the `Deployment` can be supplied directly in the `Microservice` spec if desired. The Spring Boot application runs in a `Container` called "app" by convention (or the first container if there is none called "app"). For example, to set an environment variable:
 

@@ -1,0 +1,178 @@
+A Kubernetes operator for Spring Boot microservices. If you have a container image `springguides/demo` with a Spring Boot application running on port 8080, you can deploy it to Kubernetes with just a few lines of YAML:
+
+```
+include::config/samples/demo.yaml[]
+```
+
+== Installation
+
+The controller is in Dockerhub, so you should be able to deploy it from just the YAML:
+
+```
+$ kubectl apply -f <(kustomize build github.com/dsyer/spring-boot-operator/config/default)
+```
+
+One `Service` for the controller is installed into the `spring-system` namespace:
+
+```
+$ kubectl get all -n spring-system
+NAME                                             READY   STATUS    RESTARTS   AGE
+pod/spring-controller-manager-79c6c95677-8hf89   2/2     Running   0          3m17s
+
+NAME                                                TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/spring-controller-manager-metrics-service   ClusterIP   10.111.94.226   <none>        8443/TCP   3m17s
+
+NAME                                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/spring-controller-manager   1/1     1            1           3m17s
+
+NAME                                                   DESIRED   CURRENT   READY   AGE
+replicaset.apps/spring-controller-manager-79c6c95677   1         1         1       3m17s
+```
+
+=== Building from Source
+
+If you know how to set up a GO loang development environment, and are building from source you can just do this:
+
+```
+$ make install
+$ make run
+```
+
+and then the controller will register with your default cluster.
+
+The source code has a VSCode `.devcontainer` definition, so if you use the "Remote Container" extension, you should be able to run in a container. The `devcontainer.json` has comments explaining what to set up on the host (you need to have `docker` running and set up your `~/.kube/config` to talk to your cluster).
+
+== Try it Out
+
+Send the sample YAML above to Kubernetes with `kubectl` or https://github.com/k14s/kapp[Kapp]:
+
+```
+$ kubectl apply -f <(curl https://raw.githubusercontent.com/dsyer/spring-boot-operator/master/config/samples/demo.yaml)
+```
+
+The `Microservice` generates a `Service` and a `Deployment`, similar to what you would get if you used `kubectl create` to generate them from your image. Example
+
+```
+$ kubectl apply -f config/samples/demo.yaml
+$ kubectl get all
+NAME                             READY   STATUS    RESTARTS   AGE
+pod/mysql-744f7b658d-zt2gx       1/1     Running   0          26h
+pod/demo-6b78fb7b85-2snj4        1/1     Running   0          62m
+
+NAME                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+service/kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP    3d2h
+service/demo         ClusterIP   10.104.167.30    <none>        80/TCP     62m
+
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/demo        1/1     1            1           62m
+
+NAME                                   DESIRED   CURRENT   READY   AGE
+replicaset.apps/demo-6b78fb7b85        1         1         1       62m
+
+```
+
+The `Service` is listening on port 80, so you can expose it locally using a port forward:
+
+```
+$ kubectl port-forward svc/demo 8080:80
+Forwarding from 127.0.0.1:8080 -> 8080
+Forwarding from [::1]:8080 -> 8080
+```
+
+and then in another terminal
+
+```
+$ curl localhost:8080/actuator | jq .
+{
+  "_links": {
+    "self": {
+      "href": "http://localhost:8080/actuator",
+      "templated": false
+    },
+    "health": {
+      "href": "http://localhost:8080/actuator/health",
+      "templated": false
+    },
+    "health-path": {
+      "href": "http://localhost:8080/actuator/health/{*path}",
+      "templated": true
+    },
+    "info": {
+      "href": "http://localhost:8080/actuator/info",
+      "templated": false
+    }
+  }
+}
+```
+
+There are more features, expressing opinions about how pods should be defined when Spring Boot applications are being deployed.
+
+
+== Actuators
+
+If your application container has Spring Boot Actuators then it probably makes sense to use them as Kubernetes probes. You can do that in one line (accepting the default configuration of liveness and readiness probes):
+
+```
+include::config/samples/actuators.yaml[]
+```
+
+== Spring Profiles
+
+Spring Profiles can be activated by putting `profiles` in the `Microservice` spec (as an array). Example:
+
+```
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: demo
+spec:
+  image: springguides/demo
+  profiles:
+  - mysql
+```
+
+The effect is to generate an `EnvVar` in the `Deployment` with `SPRING_PROFILES_ACTIVE=mysql`.
+
+== Bindings
+
+If your namespace has backend services, like databases, which can be exposed as https://github.com/buildpack/spec/blob/master/extensions/bindings.md[CNB Bindings], then you can list them in the `Microservice` spec. Example:
+
+```
+include::config/samples/bindings.yaml[]
+```
+
+Services are bound to by name, and by making an assumption about the way they expose their CNB Bindings, namely that a binding named `<binding>` creates a `ConfigMap` called `<binding>-metadata` and a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries that are mandatory for CNB Bindings.
+
+An https://github.com/dsyer/spring-boot-bindings[init container] is added to the application pod. It copies the configuration entries from the binding config maps and secrets into `/etc/config/application.properties`. The `SPRING_CONFIG_LOCATION` is also set to pick up this location so your application will see those properties as higher priority than those on the classpath, but still lower than system properties or environment variables. The entries for the MySQL example look like this:
+
+```
+cnb.metadata.other.host=mysql
+cnb.metadata.other.kind=mysql
+cnb.metadata.other.provider=dsyer
+cnb.metadata.other.tags=database,sql
+cnb.secret.other.password=test
+cnb.secret.other.user=test
+cnb.secret.other.database=test
+```
+
+The `kind` of the `Binding.Metadata` is also used as a key to locate a transformation rule. The rule is expressed as a set of GO templates that can be rendered from the binding. The templates are currently stored in the init container image, but could be generalized into something that could be customized by developers (or operators).
+
+There is a sample MySQL service in the project which exposes the right config maps and secrets: look in `config/samples/mysql`. The MySQL example actually generates these properties in addition:
+
+```
+spring.datasource.url=jdbc:mysql://mysql/test
+spring.datasource.username=test
+spring.datasource.password=test
+```
+
+so a Spring Boot application with `mysql-connector` will automatically connect because it matches the default naming conventions in `spring-boot-autoconfigure`.
+
+== Pod Specs
+
+The `PodSpec` in the `Deployment` can be supplied directly in the `Microservice` spec if desired. The Spring Boot application runs in a `Container` called "app" by convention (or the first container if there is none called "app"). For example, to set an environment variable:
+
+```
+include::config/samples/env.yaml[]
+```
+
+You could add your own probes here, volume mounts, whatever you need to customize the application container. The image is always set to the one in the top of the `MicroService` spec.

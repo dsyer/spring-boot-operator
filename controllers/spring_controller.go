@@ -198,8 +198,11 @@ func updateDeployment(deployment *apps.Deployment, micro *api.Microservice) *app
 	micro.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
 	container := findAppContainer(&deployment.Spec.Template.Spec)
 	setUpAppContainer(container, *micro)
-	volumes := createVolumes(&deployment.Spec.Template.Spec, micro.Spec)
-	addVolumeMounts(container, volumes)
+	volumes := createVolumes(&deployment.Spec.Template.Spec, *micro)
+	if len(volumes) > 0 {
+		setUpInitContainer(findInitContainer(&deployment.Spec.Template.Spec), volumes, *micro)
+		addVolumeMount(container)
+	}
 	addProfiles(container, micro.Spec)
 	return deployment
 }
@@ -226,43 +229,54 @@ func setEnvVar(values []corev1.EnvVar, name string, value string) []corev1.EnvVa
 	return values
 }
 
-func addVolumeMounts(container *corev1.Container, volumes []corev1.Volume) {
+func addVolumeMount(container *corev1.Container) {
+	location := "/etc/config/"
 	mounts := container.VolumeMounts
-	locations := []string{"classpath:/"}
-	for _, volume := range volumes {
-		location := fmt.Sprintf("/config/bindings/%s/metadata/", volume.Name)
-		mounts = append(mounts, corev1.VolumeMount{
-			Name:      volume.Name,
-			MountPath: location,
-		})
-		locations = append(locations, fmt.Sprintf("file://%s", location))
-	}
-	if len(mounts) > 0 {
-		env := container.Env
-		env = setEnvVar(env, "CNB_BINDINGS", "/config/bindings")
-		env = setEnvVar(env, "SPRING_CONFIG_LOCATION", strings.Join(locations, ","))
-		container.Env = env
-	}
+	mounts = append(mounts, corev1.VolumeMount{
+		Name:      "config",
+		MountPath: location,
+	})
+	locations := []string{"classpath:/", "file://" + location}
+	env := container.Env
+	env = setEnvVar(env, "CNB_BINDINGS", "/config/bindings")
+	env = setEnvVar(env, "SPRING_CONFIG_LOCATION", strings.Join(locations, ","))
+	container.Env = env
 	container.VolumeMounts = mounts
 }
 
-func createVolumes(spec *corev1.PodSpec, micro api.MicroserviceSpec) []corev1.Volume {
+func createVolumes(spec *corev1.PodSpec, micro api.Microservice) []corev1.Volume {
 	volumes := spec.Volumes
-	for _, binding := range micro.Bindings {
+	for _, binding := range micro.Spec.Bindings {
 		volumes = append(volumes, corev1.Volume{
-			Name: binding,
+			Name: fmt.Sprintf("%s-metadata", binding),
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						// We don't want a config map with the same name as the binding
-						Name: fmt.Sprintf("%s-config", binding),
+						Name: fmt.Sprintf("%s-metadata", binding),
 					},
 				},
 			},
 		})
-		// TODO: secrets
+		volumes = append(volumes, corev1.Volume{
+			Name: fmt.Sprintf("%s-secret", binding),
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: fmt.Sprintf("%s-secret", binding),
+				},
+			},
+		})
 	}
-	spec.Volumes = volumes
+	if len(micro.Spec.Bindings) > 0 {
+		volumes = append(volumes, corev1.Volume{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/data/" + micro.ObjectMeta.Name, // TODO: include uniqueness?
+				},
+			},
+		})
+		spec.Volumes = volumes
+	}
 	return volumes
 }
 
@@ -328,6 +342,54 @@ func findAppContainer(pod *corev1.PodSpec) *corev1.Container {
 		}
 		pod.Containers = append(pod.Containers, *container)
 		container = &pod.Containers[len(pod.Containers)-1]
+	}
+	return container
+}
+
+// Set up the init container, setting the image, adding volumes etc.
+func setUpInitContainer(container *corev1.Container, volumes []corev1.Volume, micro api.Microservice) {
+	container.Name = "env"
+	container.Image = "dsyer/spring-boot-bindings"
+	container.Args = []string{
+		"-f", "/etc/config/application.properties", "/config/bindings",
+	}
+	mounts := container.VolumeMounts
+	mounts = append(mounts, corev1.VolumeMount{
+		Name:      "config",
+		MountPath: "/etc/config",
+	})
+	for _, binding := range micro.Spec.Bindings {
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      fmt.Sprintf("%s-metadata", binding),
+			MountPath: fmt.Sprintf("/config/bindings/%s/metadata", binding),
+		},
+			corev1.VolumeMount{
+				Name:      fmt.Sprintf("%s-secret", binding),
+				MountPath: fmt.Sprintf("/config/bindings/%s/secret", binding),
+			})
+	}
+	container.VolumeMounts = mounts
+}
+
+// Find the container that runs the app image
+func findInitContainer(pod *corev1.PodSpec) *corev1.Container {
+	var container *corev1.Container
+	if len(pod.InitContainers) == 1 {
+		container = &pod.InitContainers[0]
+	} else {
+		for _, candidate := range pod.InitContainers {
+			if container.Name == "env" {
+				container = &candidate
+				break
+			}
+		}
+	}
+	if container == nil {
+		container = &corev1.Container{
+			Name: "env",
+		}
+		pod.InitContainers = append(pod.InitContainers, *container)
+		container = &pod.InitContainers[len(pod.Containers)-1]
 	}
 	return container
 }

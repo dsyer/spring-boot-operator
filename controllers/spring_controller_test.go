@@ -200,18 +200,28 @@ func TestCreateDeploymentBindings(t *testing.T) {
 		},
 	}
 	deployment := createDeployment(&micro)
-	container := deployment.Spec.Template.Spec.Containers[0]
-	if len(container.VolumeMounts) != 2 {
-		t.Errorf("len(container.VolumeMounts) = %d; want 2", len(container.VolumeMounts))
+	if len(deployment.Spec.Template.Spec.Volumes) != 5 {
+		t.Errorf("len(container.VolumeMounts) = %d; want 5", len(deployment.Spec.Template.Spec.Volumes))
 		t.FailNow()
 	}
-	mount := container.VolumeMounts[0]
-	if mount.Name != "mysql" {
-		t.Errorf("container.VolumeMounts[0].Name = %s; want 'mysql'", container.VolumeMounts[0].Name)
+	volume := deployment.Spec.Template.Spec.Volumes[1]
+	if volume.Name != "mysql-secret" {
+		t.Errorf("Volumes[1].Name = %s; want 'mysql-secret'", volume.Name)
 	}
-	mount = container.VolumeMounts[1]
-	if mount.Name != "redis" {
-		t.Errorf("container.VolumeMounts[1].Name = %s; want 'mysql'", container.VolumeMounts[1].Name)
+	if volume.VolumeSource.Secret.SecretName != "mysql-secret" {
+		t.Errorf("Volumes[1].Name = %s; want 'mysql-secret'", volume.VolumeSource.Secret.SecretName)
+	}
+	volume = deployment.Spec.Template.Spec.Volumes[0]
+	if volume.Name != "mysql-metadata" {
+		t.Errorf("Volumes[0].Name = %s; want 'mysql-metadata'", volume.Name)
+	}
+	if volume.ConfigMap.Name != "mysql-metadata" {
+		t.Errorf("Volumes[0].Name = %s; want 'mysql-metadata'", volume.ConfigMap.Name)
+	}
+	container := deployment.Spec.Template.Spec.Containers[0]
+	if len(container.VolumeMounts) != 1 {
+		t.Errorf("len(container.VolumeMounts) = %d; want 1", len(container.VolumeMounts))
+		t.FailNow()
 	}
 	var env corev1.EnvVar
 	for _, item := range container.Env {
@@ -226,8 +236,25 @@ func TestCreateDeploymentBindings(t *testing.T) {
 	if !strings.Contains(env.Value, "classpath:/,") {
 		t.Errorf("SPRING_CONFIG_LOCATION should contain classpath:/, found %s", env.Value)
 	}
-	if !strings.Contains(env.Value, "file:///config/bindings/mysql/metadata/,") {
-		t.Errorf("SPRING_CONFIG_LOCATION should contain file:///config/bindings/mysql/metadata/, found %s", env.Value)
+	if !strings.Contains(env.Value, "file:///etc/config/") {
+		t.Errorf("SPRING_CONFIG_LOCATION should contain file:///etc/config/, found %s", env.Value)
+	}
+	container = deployment.Spec.Template.Spec.InitContainers[0]
+	if len(container.VolumeMounts) != 5 {
+		t.Errorf("len(container.VolumeMounts) = %d; want 5", len(container.VolumeMounts))
+		t.FailNow()
+	}
+	mount := container.VolumeMounts[1]
+	if mount.Name != "mysql-metadata" {
+		t.Errorf("container.VolumeMounts[0].Name = %s; want 'mysql-metadata'", container.VolumeMounts[0].Name)
+	}
+	mount = container.VolumeMounts[3]
+	if mount.Name != "redis-metadata" {
+		t.Errorf("container.VolumeMounts[1].Name = %s; want 'redis-metadata'", container.VolumeMounts[1].Name)
+	}
+	mount = container.VolumeMounts[0]
+	if mount.Name != "config" {
+		t.Errorf("container.VolumeMounts[1].Name = %s; want 'config'", container.VolumeMounts[1].Name)
 	}
 
 }

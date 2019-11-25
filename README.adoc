@@ -1,7 +1,14 @@
+:toc:
+
 A Kubernetes operator for Spring Boot microservices. If you have a container image `springguides/demo` with a Spring Boot application running on port 8080, you can deploy it to Kubernetes with just a few lines of YAML:
 
 ```
-include::config/samples/demo.yaml[]
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: demo
+spec:
+  image: springguides/demo
 ```
 
 == Installation
@@ -113,7 +120,13 @@ There are more features, expressing opinions about how pods should be defined wh
 If your application container has Spring Boot Actuators then it probably makes sense to use them as Kubernetes probes. You can do that in one line (accepting the default configuration of liveness and readiness probes):
 
 ```
-include::config/samples/actuators.yaml[]
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: actr
+spec:
+  image: springguides/demo
+  actuators: true
 ```
 
 == Spring Profiles
@@ -138,7 +151,16 @@ The effect is to generate an `EnvVar` in the `Deployment` with `SPRING_PROFILES_
 If your namespace has backend services, like databases, which can be exposed as https://github.com/buildpack/spec/blob/master/extensions/bindings.md[CNB Bindings], then you can list them in the `Microservice` spec. Example:
 
 ```
-include::config/samples/bindings.yaml[]
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: bindings
+spec:
+  image: springguides/demo
+  bindings:
+  - mysql
+  profiles:
+  - mysql
 ```
 
 Services are bound to by name, and by making an assumption about the way they expose their CNB Bindings, namely that a binding named `<binding>` creates a `ConfigMap` called `<binding>-metadata` and a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries that are mandatory for CNB Bindings.
@@ -172,7 +194,19 @@ so a Spring Boot application with `mysql-connector` will automatically connect b
 The `PodSpec` in the `Deployment` can be supplied directly in the `Microservice` spec if desired. The Spring Boot application runs in a `Container` called "app" by convention (or the first container if there is none called "app"). For example, to set an environment variable:
 
 ```
-include::config/samples/env.yaml[]
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: env
+spec:
+  image: springguides/demo
+  pod:
+    containers:
+    # the "app" container is special - it doesn't need an image
+    - name: app
+      env:
+      - name: EXT_LIBS
+        value: /app/ext
 ```
 
 You could add your own probes here, volume mounts, whatever you need to customize the application container. The image is always set to the one in the top of the `MicroService` spec.

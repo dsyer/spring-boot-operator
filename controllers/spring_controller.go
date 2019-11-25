@@ -39,8 +39,8 @@ type MicroserviceReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=micro.io,resources=microservices,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=micro.io,resources=microservices/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=spring.io,resources=microservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=spring.io,resources=microservices/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 

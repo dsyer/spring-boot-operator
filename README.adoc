@@ -38,7 +38,7 @@ replicaset.apps/spring-controller-manager-79c6c95677   1         1         1    
 
 === Building from Source
 
-If you know how to set up a GO loang development environment, and are building from source you can just do this:
+If you know how to set up a GO lang development environment, and are building from source you can just do this:
 
 ```
 $ make install

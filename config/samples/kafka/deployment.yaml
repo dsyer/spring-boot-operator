@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  labels:
+    app: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      kafka: kafka
+  template:
+    metadata:
+      labels:
+        kafka: kafka
+    spec:
+      containers:
+        - image: confluentinc/cp-enterprise-kafka:5.3.0
+          name: kafka
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KAFKA_BROKER_ID
+              value: '1'
+            - name: KAFKA_ZOOKEEPER_CONNECT
+              value: zookeeper:2181
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: INTERNAL://kafka-broker:29092,EXTERNAL://localhost:9092
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: INTERNAL
+              
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper
+  labels:
+    app: zookeeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      kafka: zookeeper
+  template:
+    metadata:
+      labels:
+        kafka: zookeeper
+    spec:
+      containers:
+        - image: confluentinc/cp-zookeeper:5.3.0
+          name: kafka
+          env:
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: '2181'
+            - name: ZOOKEEPER_TICK_TIME
+              value: '2000'
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-broker
+  labels:
+    kafka: kafka
+spec:
+  ports:
+    - port: 9092
+      name: rest
+    - port: 29092
+      name: kafka
+  selector:
+    kafka: kafka
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  labels:
+    kafka: zookeeper
+spec:
+  ports:
+    - port: 2181
+  selector:
+    kafka: zookeeper

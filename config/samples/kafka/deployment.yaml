@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: kafka
   labels:
     app: kafka
 spec:
+  serviceName: kafka-broker
   replicas: 1
   selector:
     matchLabels:
@@ -18,22 +19,6 @@ spec:
         - image: confluentinc/cp-enterprise-kafka:5.3.0
           name: kafka
           env:
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: HOST_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
             - name: KAFKA_BROKER_ID
               value: '1'
             - name: KAFKA_ZOOKEEPER_CONNECT
@@ -48,12 +33,13 @@ spec:
 
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: zookeeper
   labels:
     app: zookeeper
 spec:
+  serviceName: zookeeper
   replicas: 1
   selector:
     matchLabels:

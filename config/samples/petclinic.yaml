@@ -11,6 +11,8 @@ spec:
     containers:
     - name: app
       env:
+      - name: MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS
+        value: always
       - name: MANAGEMENT_ENDPOINTS_WEB_BASEPATH
         value: /actuator
       - name: SPRING_DATASOURCE_INITIALIZATION_MODE

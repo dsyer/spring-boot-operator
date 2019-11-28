@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/spring.io_microservices.yaml
+- bases/spring.io_bindings.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

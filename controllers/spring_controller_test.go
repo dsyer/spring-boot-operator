@@ -73,7 +73,10 @@ func TestCreateDeploymentVanilla(t *testing.T) {
 		t.Errorf("Deployment.Name = %s; want 'demo'", deployment.Name)
 	}
 	if deployment.Labels["app"] != "demo" {
-		t.Errorf("Service.Labels['app'] = %s; want 'demo'", deployment.Labels["app"])
+		t.Errorf("Deployment.Labels['app'] = %s; want 'demo'", deployment.Labels["app"])
+	}
+	if len(deployment.Spec.Selector.MatchLabels) != 1 {
+		t.Errorf("len(deployment.Spec.Selector.MatchLabels) = %d; want 1", len(deployment.Spec.Selector.MatchLabels))
 	}
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))

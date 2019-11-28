@@ -22,11 +22,12 @@ import (
 
 // MicroserviceSpec defines the desired state of Microservice
 type MicroserviceSpec struct {
-	Image     string         `json:"image,omitempty"`
-	Actuators bool           `json:"actuators,omitempty"`
-	Pod       corev1.PodSpec `json:"pod,omitempty"`
-	Bindings  []string       `json:"bindings,omitempty"`
-	Profiles  []string       `json:"profiles,omitempty"`
+	Image       string            `json:"image,omitempty"`
+	Actuators   bool              `json:"actuators,omitempty"`
+	Pod         corev1.PodSpec    `json:"pod,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Bindings    []string          `json:"bindings,omitempty"`
+	Profiles    []string          `json:"profiles,omitempty"`
 }
 
 // MicroserviceStatus defines the observed state of Microservice

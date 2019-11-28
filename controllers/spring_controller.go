@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -54,6 +55,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	ctx := context.Background()
 	log := r.Log.WithValues("microservice", req.NamespacedName)
 
+	log.Info("Responding", "req", req)
 	var micro api.Microservice
 	if err := r.Get(ctx, req.NamespacedName, &micro); err != nil {
 		err = client.IgnoreNotFound(err)
@@ -78,6 +80,34 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	var service *corev1.Service
 	var deployment *apps.Deployment
 
+	if len(deployments.Items) == 0 {
+		var err error
+		deployment, err = r.constructDeployment(&micro)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.Create(ctx, deployment); err != nil {
+			log.Error(err, "Unable to create Deployment for micro", "deployment", deployment)
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Created Deployments for micro", "deployment", deployment)
+	} else {
+		// update if changed
+		deployment = &deployments.Items[0]
+		deployment = updateDeployment(deployment, &micro)
+		if err := r.Update(ctx, deployment); err != nil {
+			if apierrors.IsConflict(err) {
+				log.Info("Unable to update Deployment: reason conflict. Will retry on next event.")
+			} else {
+				log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
+			}
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Updated Deployments for micro", "deployment", deployment)
+	}
+
 	log.Info("Found services", "services", len(services.Items))
 	if len(services.Items) == 0 {
 		var err error
@@ -96,34 +126,15 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		service = &services.Items[0]
 		service = updateService(service, &micro)
 		if err := r.Update(ctx, service); err != nil {
-			log.Error(err, "Unable to update Service for micro", "service", service)
+			if apierrors.IsConflict(err) {
+				log.Info("Unable to update Service: reason conflict. Will retry on next event.")
+			} else {
+				log.Error(err, "Unable to update Service for micro", "service", service)
+			}
 			return ctrl.Result{}, err
 		}
 
 		log.Info("Updated Service for micro", "service", service)
-	}
-	if len(deployments.Items) == 0 {
-		var err error
-		deployment, err = r.constructDeployment(&micro)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if err := r.Create(ctx, deployment); err != nil {
-			log.Error(err, "Unable to create Deployment for micro", "deployment", deployment)
-			return ctrl.Result{}, err
-		}
-
-		log.Info("Created Deployments for micro", "deployment", deployment)
-	} else {
-		// update if changed
-		deployment = &deployments.Items[0]
-		deployment = updateDeployment(deployment, &micro)
-		if err := r.Update(ctx, deployment); err != nil {
-			log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
-			return ctrl.Result{}, err
-		}
-
-		log.Info("Updated Deployments for micro", "deployment", deployment)
 	}
 
 	micro.Status.ServiceName = service.GetName()
@@ -191,6 +202,9 @@ func createDeployment(micro *api.Microservice) *apps.Deployment {
 		},
 	}
 	deployment = updateDeployment(deployment, micro)
+	for k, v := range deployment.Spec.Template.Annotations {
+		deployment.Spec.Template.Annotations[k] = v
+	}
 	return deployment
 }
 

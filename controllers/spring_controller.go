@@ -55,7 +55,6 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	ctx := context.Background()
 	log := r.Log.WithValues("microservice", req.NamespacedName)
 
-	log.Info("Responding", "req", req)
 	var micro api.Microservice
 	if err := r.Get(ctx, req.NamespacedName, &micro); err != nil {
 		err = client.IgnoreNotFound(err)
@@ -194,22 +193,15 @@ func createDeployment(micro *api.Microservice) *apps.Deployment {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": micro.Name},
 			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": micro.Name},
-				},
-			},
+			Template: corev1.PodTemplateSpec{},
 		},
 	}
 	deployment = updateDeployment(deployment, micro)
-	for k, v := range deployment.Spec.Template.Annotations {
-		deployment.Spec.Template.Annotations[k] = v
-	}
 	return deployment
 }
 
 func updateDeployment(deployment *apps.Deployment, micro *api.Microservice) *apps.Deployment {
-	micro.Spec.Pod.DeepCopyInto(&deployment.Spec.Template.Spec)
+	micro.Spec.Template.DeepCopyInto(&deployment.Spec.Template)
 	container := findAppContainer(&deployment.Spec.Template.Spec)
 	setUpAppContainer(container, *micro)
 	volumes := createVolumes(&deployment.Spec.Template.Spec, *micro)
@@ -218,6 +210,10 @@ func updateDeployment(deployment *apps.Deployment, micro *api.Microservice) *app
 		addVolumeMount(container)
 	}
 	addProfiles(container, micro.Spec)
+	if deployment.Spec.Template.ObjectMeta.Labels == nil {
+		deployment.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	}
+	deployment.Spec.Template.ObjectMeta.Labels["app"] = micro.Name
 	return deployment
 }
 

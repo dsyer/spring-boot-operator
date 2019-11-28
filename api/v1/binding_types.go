@@ -22,8 +22,7 @@ import (
 
 // BindingSpec defines the desired state of Binding
 type BindingSpec struct {
-	Pod         corev1.PodSpec    `json:"pod,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	Template corev1.PodTemplateSpec `json:"template,omitempty"`
 }
 
 // BindingStatus defines the observed state of Binding

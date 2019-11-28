@@ -191,7 +191,7 @@ so a Spring Boot application with `mysql-connector` will automatically connect b
 
 == Pod Specs
 
-The `PodSpec` in the `Deployment` can be supplied directly in the `Microservice` spec if desired. The Spring Boot application runs in a `Container` called "app" by convention (or the first container if there is none called "app"). For example, to set an environment variable:
+The `PodTemplateSpec` in the `Deployment` can be supplied directly in the `Microservice` spec if desired. The Spring Boot application runs in a `Container` called "app" by convention (or the first container if there is none called "app"), so any configuration of that `Pod` in the `Microservice` is applied to the `Deployment`. For example, to set an environment variable:
 
 ```
 apiVersion: spring.io/v1
@@ -200,13 +200,14 @@ metadata:
   name: env
 spec:
   image: springguides/demo
-  pod:
-    containers:
-    # the "app" container is special - it doesn't need an image
-    - name: app
-      env:
-      - name: EXT_LIBS
-        value: /app/ext
+  template:
+    spec:
+      containers:
+      # the "app" container is special - it doesn't need an image
+      - name: app
+        env:
+        - name: EXT_LIBS
+          value: /app/ext
 ```
 
 You could add your own probes here, volume mounts, whatever you need to customize the application container. The image is always set to the one in the top of the `MicroService` spec.

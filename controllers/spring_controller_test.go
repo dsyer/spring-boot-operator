@@ -78,6 +78,9 @@ func TestCreateDeploymentVanilla(t *testing.T) {
 	if len(deployment.Spec.Selector.MatchLabels) != 1 {
 		t.Errorf("len(deployment.Spec.Selector.MatchLabels) = %d; want 1", len(deployment.Spec.Selector.MatchLabels))
 	}
+	if len(deployment.Spec.Template.ObjectMeta.Labels) != 1 {
+		t.Errorf("len(deployment.Spec.Template.ObjectMeta.Labels) = %d; want 1", len(deployment.Spec.Template.ObjectMeta.Labels))
+	}
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
 	}
@@ -121,13 +124,15 @@ func TestCreateDeploymentExistingAnonymousContainer(t *testing.T) {
 		},
 		Spec: api.MicroserviceSpec{
 			Image: "springguides/demo",
-			Pod: corev1.PodSpec{
-				Containers: []corev1.Container{
-					corev1.Container{
-						Env: []corev1.EnvVar{
-							corev1.EnvVar{
-								Name:  "FOO",
-								Value: "BAR",
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Env: []corev1.EnvVar{
+								corev1.EnvVar{
+									Name:  "FOO",
+									Value: "BAR",
+								},
 							},
 						},
 					},
@@ -160,14 +165,16 @@ func TestCreateDeploymentExistingContainer(t *testing.T) {
 		},
 		Spec: api.MicroserviceSpec{
 			Image: "springguides/demo",
-			Pod: corev1.PodSpec{
-				Containers: []corev1.Container{
-					corev1.Container{
-						Name: "app",
-						Env: []corev1.EnvVar{
-							corev1.EnvVar{
-								Name:  "FOO",
-								Value: "BAR",
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name: "app",
+							Env: []corev1.EnvVar{
+								corev1.EnvVar{
+									Name:  "FOO",
+									Value: "BAR",
+								},
 							},
 						},
 					},

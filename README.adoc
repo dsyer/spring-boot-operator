@@ -36,6 +36,20 @@ NAME                                                   DESIRED   CURRENT   READY
 replicaset.apps/spring-controller-manager-79c6c95677   1         1         1       3m17s
 ```
 
+Petclinic:
+
+```
+$ kubectl apply -f <(kustomize build github.com/dsyer/spring-boot-operator/config/samples/mysql)
+$ kubectl apply -f <(curl https://raw.githubusercontent.com/dsyer/spring-boot-operator/master/config/samples/petclinic.yaml)
+```
+
+Clean up:
+
+```
+$ kubectl delete microservices --all
+$ kubectl delete namespace spring-system
+```
+
 === Building from Source
 
 If you know how to set up a GO lang development environment, and are building from source you can just do this:
@@ -148,7 +162,7 @@ The effect is to generate an `EnvVar` in the `Deployment` with `SPRING_PROFILES_
 
 == Bindings
 
-If your namespace has backend services, like databases, which can be exposed as https://github.com/buildpack/spec/blob/master/extensions/bindings.md[CNB Bindings], then you can list them in the `Microservice` spec. Example:
+If your namespace has backend services, like databases, which can be exposed as https://github.com/buildpack/spec/blob/master/extensions/bindings.md[CNB Bindings], then you can list them in the `Microservice` spec. There is a CRD for `ServiceBinding` which developers (or operators) can use to define the behaviour of the of all `Microservice` instances in the same namespace. Example:
 
 ```
 apiVersion: spring.io/v1
@@ -163,9 +177,33 @@ spec:
   - mysql
 ```
 
-Services are bound to by name, and by making an assumption about the way they expose their CNB Bindings, namely that a binding named `<binding>` creates a `ConfigMap` called `<binding>-metadata` and a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries that are mandatory for CNB Bindings.
+Each binding is used to search for a `ServiceBinding` of the same name, in the same namespace. If no matching `ServiceBinding` is defined, then a default is provided based on a naming convention.
 
-An https://github.com/dsyer/spring-boot-bindings[init container] is added to the application pod. It copies the configuration entries from the binding config maps and secrets into `/etc/config/application.properties`. The `SPRING_CONFIG_LOCATION` is also set to pick up this location so your application will see those properties as higher priority than those on the classpath, but still lower than system properties or environment variables. The entries for the MySQL example look like this:
+=== Custom Bindings
+
+A binding carries a patch for the `PodTemplateSpec`. It can add a restart policy, annotations, volumes, containers, and init containers, or it can modify the "app" container. Containers can be patched using the volume mounts, env vars, image, command, args, or working dir properties. For example:
+
+```
+apiVersion: spring.io/v1
+kind: ServiceBinding
+metadata:
+  name: prometheus
+spec:
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
+        prometheus.io/scrape: "true"
+```
+
+This one adds the annotations that are needed by the Prometheus Helm chart installation to pull metrics from the Spring Boot Actuator endpoint.
+
+=== Default Bindings
+
+Services are bound to by name, and by making an assumption about the way they expose their CNB Bindings, namely that a binding named `<binding>` creates a `ConfigMap` called `<binding>-metadata` and a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries since those are mandatory for CNB Bindings.
+
+An https://github.com/dsyer/spring-boot-bindings[init container] named "env" is added to the application pod. It copies the configuration entries from the binding config maps and secrets into `/etc/config/application.properties`. The `SPRING_CONFIG_LOCATION` is also set to pick up this location so your application will see those properties as higher priority than those on the classpath, but still lower than system properties or environment variables. The entries for the MySQL example look like this:
 
 ```
 cnb.metadata.other.host=mysql

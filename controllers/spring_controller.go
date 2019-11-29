@@ -489,29 +489,6 @@ func setUpInitContainer(container *corev1.Container, binding string) {
 	container.VolumeMounts = mounts
 }
 
-// Find the container that runs the app image
-func findInitContainer(pod *corev1.PodSpec) *corev1.Container {
-	var container *corev1.Container
-	if len(pod.InitContainers) == 1 {
-		container = &pod.InitContainers[0]
-	} else {
-		for _, candidate := range pod.InitContainers {
-			if container.Name == "env" {
-				container = &candidate
-				break
-			}
-		}
-	}
-	if container == nil {
-		container = &corev1.Container{
-			Name: "env",
-		}
-		pod.InitContainers = append(pod.InitContainers, *container)
-		container = &pod.InitContainers[len(pod.Containers)-1]
-	}
-	return container
-}
-
 // SetupWithManager Utility method to set up manager
 func (r *MicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(&apps.Deployment{}, ownerKey, func(rawObj runtime.Object) []string {

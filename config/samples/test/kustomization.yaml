@@ -14,9 +14,3 @@ configMapGenerator:
         foo
     files:
     - main.tmpl
-secretGenerator:
-  - name: test-secret
-    behavior: merge
-    literals:
-      - foo=bar
-      

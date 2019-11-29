@@ -14,8 +14,6 @@ spec:
           mountPath: /etc/config
         - name: test-metadata
           mountPath: /config/bindings/test/metadata
-        - name: test-secret
-          mountPath: /config/bindings/test/secret
         - name: test-metadata
           mountPath: /config/templates/test
       containers:
@@ -32,9 +30,6 @@ spec:
       - name: test-metadata
         configMap:
           name: test-metadata
-      - name: test-secret
-        secret:
-          secretName: test-secret
       - name: config
         hostPath:
           path: /data

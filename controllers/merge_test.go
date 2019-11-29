@@ -41,6 +41,48 @@ func TestMergeContainersWithEnv(t *testing.T) {
 	}
 }
 
+func TestMergeContainersWithCommand(t *testing.T) {
+	source := corev1.Container{
+		Image:   "springguides/demo",
+		Command: []string{"foo", "bar"},
+	}
+	target := corev1.Container{}
+	mergeContainers(source, &target)
+	if len(target.Command) != 2 {
+		t.Errorf("Container.Command = %d; want 2", len(target.Command))
+	}
+	if target.Command[0] != "foo" {
+		t.Errorf("Container.Command[0] = %s; want 'foo'", target.Command[0])
+	}
+}
+
+func TestMergeContainersWithArgs(t *testing.T) {
+	source := corev1.Container{
+		Image: "springguides/demo",
+		Args:  []string{"foo", "bar"},
+	}
+	target := corev1.Container{}
+	mergeContainers(source, &target)
+	if len(target.Args) != 2 {
+		t.Errorf("Container.Args = %d; want 2", len(target.Args))
+	}
+	if target.Args[0] != "foo" {
+		t.Errorf("Container.Args[0] = %s; want 'foo'", target.Args[0])
+	}
+}
+
+func TestMergeContainersWithWorkingDir(t *testing.T) {
+	source := corev1.Container{
+		Image:      "springguides/demo",
+		WorkingDir: "/app",
+	}
+	target := corev1.Container{}
+	mergeContainers(source, &target)
+	if target.WorkingDir != "/app" {
+		t.Errorf("Container.WorkingDir = %s; want '/app'", target.WorkingDir)
+	}
+}
+
 func TestMergeContainersWithProbes(t *testing.T) {
 	source := corev1.Container{
 		Image: "springguides/demo",

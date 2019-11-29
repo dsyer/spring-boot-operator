@@ -22,7 +22,6 @@ import (
 var (
 	emptyContainer   = corev1.Container{Name: "__empty"}
 	emptyEnvVar      = corev1.EnvVar{Name: "__empty"}
-	emptyProbe       = corev1.Probe{}
 	emptyVolume      = corev1.Volume{Name: "__empty"}
 	emptyVolumeMount = corev1.VolumeMount{Name: "__empty"}
 )
@@ -119,6 +118,18 @@ func mergeVolumes(source corev1.Volume, target *corev1.Volume) {
 func mergeContainers(source corev1.Container, target *corev1.Container) {
 	if source.Image != emptyContainer.Image {
 		target.Image = source.Image
+	}
+	if source.ImagePullPolicy != emptyContainer.ImagePullPolicy {
+		target.ImagePullPolicy = source.ImagePullPolicy
+	}
+	if len(source.Command) > 0 {
+		target.Command = source.Command
+	}
+	if len(source.Args) > 0 {
+		target.Args = source.Args
+	}
+	if source.WorkingDir != emptyContainer.WorkingDir {
+		target.WorkingDir = source.WorkingDir
 	}
 	for _, s := range source.VolumeMounts {
 		t := findVolumeMountByName(target.VolumeMounts, s.Name)

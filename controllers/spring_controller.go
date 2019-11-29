@@ -55,17 +55,23 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	ctx := context.Background()
 	log := r.Log.WithValues("microservice", req.NamespacedName)
 
+	var bindings api.ServiceBindingList
+	if err := r.List(ctx, &bindings, client.InNamespace(req.Namespace)); err != nil {
+		log.Error(err, "Unable to list Bindings")
+		// Not fatal
+	}
+
 	var micro api.Microservice
 	if err := r.Get(ctx, req.NamespacedName, &micro); err != nil {
 		err = client.IgnoreNotFound(err)
 		if err != nil {
 			log.Error(err, "Unable to fetch micro")
 		}
+		r.updateBindings(bindings, req)
 		return ctrl.Result{}, err
 	}
 	log.Info("Updating", "resource", micro)
 
-	var bindings api.ServiceBindingList
 	var services corev1.ServiceList
 	var deployments apps.DeploymentList
 	if err := r.List(ctx, &services, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
@@ -78,10 +84,6 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	var bindingsToApply []api.ServiceBinding
 	if len(micro.Spec.Bindings) > 0 {
-		if err := r.List(ctx, &bindings, client.InNamespace(req.Namespace)); err != nil {
-			log.Error(err, "Unable to list Bindings")
-			return ctrl.Result{}, err
-		}
 		bindingsToApply = findBindingsToApply(micro, bindings.Items)
 	}
 
@@ -159,8 +161,48 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 		return ctrl.Result{}, err
 	}
+	if err := r.updateBindings(bindings, req); err != nil {
+		if apierrors.IsConflict(err) {
+			log.Info("Unable to update binding status: reason conflict. Will retry on next event.")
+		} else {
+			log.Error(err, "Unable to update binding status")
+		}
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *MicroserviceReconciler) updateBindings(bindings api.ServiceBindingList, req ctrl.Request) error {
+	if len(bindings.Items) == 0 {
+		return nil
+	}
+	ctx := context.Background()
+	log := r.Log.WithValues("microservice", req.NamespacedName)
+	log.Info("Updating binding statuses")
+	var micros api.MicroserviceList
+	if err := r.List(ctx, &micros, client.InNamespace(req.Namespace)); err != nil {
+		log.Error(err, "Unable to list child Services")
+		return err
+	}
+	bounds := map[string][]string{}
+	for _, micro := range micros.Items {
+		for _, name := range micro.Spec.Bindings {
+			bounds[name] = append(bounds[name], micro.Name)
+		}
+	}
+	var result error
+	for _, binding := range bindings.Items {
+		if bound, ok := bounds[binding.Name]; ok {
+			binding.Status.Bound = bound
+		} else {
+			binding.Status.Bound = []string{}
+		}
+		if err := r.Status().Update(ctx, &binding); err != nil {
+			result = err
+		}
+	}
+	return result
 }
 
 func findBindingsToApply(micro api.Microservice, bindings []api.ServiceBinding) []api.ServiceBinding {

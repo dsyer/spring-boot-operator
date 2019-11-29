@@ -34,7 +34,7 @@ type ServiceBindingStatus struct {
 
 // ServiceBinding is the Schema for the springs API
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Bound",type="boolean",JSONPath=".status.bound",description="bound microservices"
+// +kubebuilder:printcolumn:name="Bound",type="string",JSONPath=".status.bound",description="bound microservices"
 type ServiceBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

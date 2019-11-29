@@ -10,7 +10,7 @@ spec:
   - JSONPath: .status.bound
     description: bound microservices
     name: Bound
-    type: boolean
+    type: string
   group: spring.io
   names:
     kind: ServiceBinding

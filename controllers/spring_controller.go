@@ -199,7 +199,6 @@ func (r *MicroserviceReconciler) updateBindings(bindings api.ServiceBindingList,
 	}
 	ctx := context.Background()
 	log := r.Log.WithValues("microservice", req.NamespacedName)
-	log.Info("Updating binding statuses", "bindings", bindings)
 	var micros api.MicroserviceList
 	if err := r.List(ctx, &micros, client.InNamespace(req.Namespace)); err != nil {
 		log.Error(err, "Unable to list Microservices")
@@ -212,16 +211,19 @@ func (r *MicroserviceReconciler) updateBindings(bindings api.ServiceBindingList,
 		}
 	}
 	var result error
+	names := []string{}
 	for _, binding := range bindings.Items {
 		if bound, ok := bounds[binding.Name]; ok {
 			binding.Status.Bound = bound
 		} else {
 			binding.Status.Bound = []string{}
 		}
+		names = append(names, binding.Name)
 		if err := r.Status().Update(ctx, &binding); err != nil {
 			result = err
 		}
 	}
+	log.Info("Updated binding statuses", "bindings", names)
 	return result
 }
 

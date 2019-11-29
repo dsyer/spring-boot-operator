@@ -1,0 +1,42 @@
+apiVersion: spring.io/v1
+kind: ServiceBinding
+metadata:
+  name: test
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: env
+        image: dsyer/spring-boot-bindings
+        args: ["-f", "/etc/config/application.properties", "/config/bindings"]
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+        - name: test-metadata
+          mountPath: /config/bindings/test/metadata
+        - name: test-secret
+          mountPath: /config/bindings/test/secret
+        - name: test-metadata
+          mountPath: /config/templates/test
+      containers:
+      - name: app
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+        env:
+        - name: SPRING_CONFIG_LOCATION
+          value: classpath:/,file:///etc/config/
+        - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+          value: '*'
+      volumes:
+      - name: test-metadata
+        configMap:
+          name: test-metadata
+      - name: test-secret
+        secret:
+          secretName: test-secret
+      - name: config
+        hostPath:
+          path: /data
+
+

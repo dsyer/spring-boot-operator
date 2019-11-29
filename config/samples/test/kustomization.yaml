@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - binding.yaml
+  - config.yaml
+configMapGenerator:
+  - name: test-metadata
+    behavior: merge
+    literals:
+      - kind=test
+      - provider=dsyer
+      - |
+        tags=test
+        foo
+    files:
+    - main.tmpl
+secretGenerator:
+  - name: test-secret
+    behavior: merge
+    literals:
+      - foo=bar
+      

@@ -1,0 +1,8 @@
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: testing
+spec:
+  image: springguides/demo
+  bindings:
+  - test

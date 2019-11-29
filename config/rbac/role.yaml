@@ -50,3 +50,27 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - spring.io
+  resources:
+  - servicebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - spring.io
+  resources:
+  - servicebindings/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

@@ -1,7 +1,7 @@
 apiVersion: spring.io/v1
 kind: Microservice
 metadata:
-  name: prometheus
+  name: metrics
 spec:
   image: springguides/demo
   bindings:

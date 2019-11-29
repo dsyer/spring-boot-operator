@@ -156,6 +156,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err := r.Status().Update(ctx, &micro); err != nil {
 		if apierrors.IsConflict(err) {
 			log.Info("Unable to update status: reason conflict. Will retry on next event.")
+			err = nil
 		} else {
 			log.Error(err, "Unable to update micro status")
 		}
@@ -164,6 +165,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err := r.updateBindings(bindings, req); err != nil {
 		if apierrors.IsConflict(err) {
 			log.Info("Unable to update binding status: reason conflict. Will retry on next event.")
+			err = nil
 		} else {
 			log.Error(err, "Unable to update binding status")
 		}

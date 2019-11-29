@@ -65,6 +65,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	log.Info("Updating", "resource", micro)
 
+	var bindings api.ServiceBindingList
 	var services corev1.ServiceList
 	var deployments apps.DeploymentList
 	if err := r.List(ctx, &services, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
@@ -75,13 +76,21 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		log.Error(err, "Unable to list child Deployments")
 		return ctrl.Result{}, err
 	}
+	var bindingsToApply []api.ServiceBinding
+	if len(micro.Spec.Bindings) > 0 {
+		if err := r.List(ctx, &bindings, client.InNamespace(req.Namespace)); err != nil {
+			log.Error(err, "Unable to list Bindings")
+			return ctrl.Result{}, err
+		}
+		bindingsToApply = findBindingsToApply(micro, bindings.Items)
+	}
 
 	var service *corev1.Service
 	var deployment *apps.Deployment
 
 	if len(deployments.Items) == 0 {
 		var err error
-		deployment, err = r.constructDeployment(&micro)
+		deployment, err = r.constructDeployment(bindingsToApply, &micro)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -94,10 +103,11 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	} else {
 		// update if changed
 		deployment = &deployments.Items[0]
-		deployment = updateDeployment(deployment, &micro)
+		deployment = updateDeployment(deployment, bindingsToApply, &micro)
 		if err := r.Update(ctx, deployment); err != nil {
 			if apierrors.IsConflict(err) {
 				log.Info("Unable to update Deployment: reason conflict. Will retry on next event.")
+				err = nil
 			} else {
 				log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
 			}
@@ -127,6 +137,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		if err := r.Update(ctx, service); err != nil {
 			if apierrors.IsConflict(err) {
 				log.Info("Unable to update Service: reason conflict. Will retry on next event.")
+				err = nil
 			} else {
 				log.Error(err, "Unable to update Service for micro", "service", service)
 			}
@@ -141,11 +152,60 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	micro.Status.Running = deployment.Status.AvailableReplicas > 0
 
 	if err := r.Status().Update(ctx, &micro); err != nil {
-		log.Error(err, "Unable to update micro status")
+		if apierrors.IsConflict(err) {
+			log.Info("Unable to update status: reason conflict. Will retry on next event.")
+		} else {
+			log.Error(err, "Unable to update micro status")
+		}
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func findBindingsToApply(micro api.Microservice, bindings []api.ServiceBinding) []api.ServiceBinding {
+	var bindingsToApply = []api.ServiceBinding{}
+	bindingsMap := map[string]api.ServiceBinding{}
+	for _, binding := range bindings {
+		bindingsMap[binding.Name] = binding
+	}
+	for _, name := range micro.Spec.Bindings {
+		if binding, ok := bindingsMap[name]; ok {
+			bindingsToApply = append(bindingsToApply, binding)
+		} else {
+			bindingsToApply = append(bindingsToApply, defaultBinding(name, micro.Name))
+		}
+	}
+	return bindingsToApply
+}
+
+func defaultBinding(name string, config string) api.ServiceBinding {
+	initContainer := corev1.Container{
+		Name: "env",
+	}
+	appContainer := corev1.Container{
+		Name: "app",
+	}
+	binding := api.ServiceBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.ServiceBindingSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{},
+			},
+		},
+	}
+	binding.Spec.Template.Spec.Volumes = createVolumes(name, config)
+	setUpInitContainer(&initContainer, name)
+	addVolumeMount(&appContainer)
+	binding.Spec.Template.Spec.Containers = []corev1.Container{
+		appContainer,
+	}
+	binding.Spec.Template.Spec.InitContainers = []corev1.Container{
+		initContainer,
+	}
+	return binding
 }
 
 func createService(micro *api.Microservice) *corev1.Service {
@@ -182,7 +242,7 @@ func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*cor
 	return service, nil
 }
 
-func createDeployment(micro *api.Microservice) *apps.Deployment {
+func createDeployment(bindings []api.ServiceBinding, micro *api.Microservice) *apps.Deployment {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"app": micro.Name},
@@ -196,19 +256,17 @@ func createDeployment(micro *api.Microservice) *apps.Deployment {
 			Template: corev1.PodTemplateSpec{},
 		},
 	}
-	deployment = updateDeployment(deployment, micro)
+	deployment = updateDeployment(deployment, bindings, micro)
 	return deployment
 }
 
-func updateDeployment(deployment *apps.Deployment, micro *api.Microservice) *apps.Deployment {
-	micro.Spec.Template.DeepCopyInto(&deployment.Spec.Template)
+func updateDeployment(deployment *apps.Deployment, bindings []api.ServiceBinding, micro *api.Microservice) *apps.Deployment {
+	for _, binding := range bindings {
+		mergePodTemplates(binding.Spec.Template, &deployment.Spec.Template)
+	}
+	mergePodTemplates(micro.Spec.Template, &deployment.Spec.Template)
 	container := findAppContainer(&deployment.Spec.Template.Spec)
 	setUpAppContainer(container, *micro)
-	volumes := createVolumes(&deployment.Spec.Template.Spec, *micro)
-	if len(volumes) > 0 {
-		setUpInitContainer(findInitContainer(&deployment.Spec.Template.Spec), volumes, *micro)
-		addVolumeMount(container)
-	}
 	addProfiles(container, micro.Spec)
 	if deployment.Spec.Template.ObjectMeta.Labels == nil {
 		deployment.Spec.Template.ObjectMeta.Labels = map[string]string{}
@@ -242,10 +300,16 @@ func setEnvVar(values []corev1.EnvVar, name string, value string) []corev1.EnvVa
 func addVolumeMount(container *corev1.Container) {
 	location := "/etc/config/"
 	mounts := container.VolumeMounts
-	mounts = append(mounts, corev1.VolumeMount{
-		Name:      "config",
-		MountPath: location,
-	})
+	locator := map[string]corev1.VolumeMount{}
+	for _, volume := range mounts {
+		locator[volume.Name] = volume
+	}
+	if _, ok := locator["config"]; !ok {
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      "config",
+			MountPath: location,
+		})
+	}
 	locations := []string{"classpath:/", "file://" + location}
 	env := container.Env
 	env = setEnvVar(env, "CNB_BINDINGS", "/config/bindings")
@@ -254,45 +318,41 @@ func addVolumeMount(container *corev1.Container) {
 	container.VolumeMounts = mounts
 }
 
-func createVolumes(spec *corev1.PodSpec, micro api.Microservice) []corev1.Volume {
-	volumes := spec.Volumes
-	for _, binding := range micro.Spec.Bindings {
-		volumes = append(volumes, corev1.Volume{
-			Name: fmt.Sprintf("%s-metadata", binding),
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: fmt.Sprintf("%s-metadata", binding),
-					},
+func createVolumes(binding string, config string) []corev1.Volume {
+	volumes := []corev1.Volume{}
+	name := fmt.Sprintf("%s-metadata", binding)
+	volumes = append(volumes, corev1.Volume{
+		Name: name,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: name,
 				},
 			},
-		})
-		volumes = append(volumes, corev1.Volume{
-			Name: fmt.Sprintf("%s-secret", binding),
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: fmt.Sprintf("%s-secret", binding),
-				},
+		},
+	})
+	volumes = append(volumes, corev1.Volume{
+		Name: fmt.Sprintf("%s-secret", binding),
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: fmt.Sprintf("%s-secret", binding),
 			},
-		})
-	}
-	if len(micro.Spec.Bindings) > 0 {
-		volumes = append(volumes, corev1.Volume{
-			Name: "config",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/data/" + micro.ObjectMeta.Name, // TODO: include uniqueness?
-				},
+		},
+	})
+	volumes = append(volumes, corev1.Volume{
+		Name: "config",
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/data/" + config, // TODO: include uniqueness?
 			},
-		})
-		spec.Volumes = volumes
-	}
+		},
+	})
 	return volumes
 }
 
 // Create a Deployment for the microservice application
-func (r *MicroserviceReconciler) constructDeployment(micro *api.Microservice) (*apps.Deployment, error) {
-	deployment := createDeployment(micro)
+func (r *MicroserviceReconciler) constructDeployment(bindings []api.ServiceBinding, micro *api.Microservice) (*apps.Deployment, error) {
+	deployment := createDeployment(bindings, micro)
 	r.Log.Info("Deploying", "deployment", deployment)
 	if err := ctrl.SetControllerReference(micro, deployment, r.Scheme); err != nil {
 		return nil, err
@@ -357,18 +417,24 @@ func findAppContainer(pod *corev1.PodSpec) *corev1.Container {
 }
 
 // Set up the init container, setting the image, adding volumes etc.
-func setUpInitContainer(container *corev1.Container, volumes []corev1.Volume, micro api.Microservice) {
+func setUpInitContainer(container *corev1.Container, binding string) {
 	container.Name = "env"
 	container.Image = "dsyer/spring-boot-bindings"
 	container.Args = []string{
 		"-f", "/etc/config/application.properties", "/config/bindings",
 	}
 	mounts := container.VolumeMounts
-	mounts = append(mounts, corev1.VolumeMount{
-		Name:      "config",
-		MountPath: "/etc/config",
-	})
-	for _, binding := range micro.Spec.Bindings {
+	locator := map[string]corev1.VolumeMount{}
+	for _, volume := range mounts {
+		locator[volume.Name] = volume
+	}
+	if _, ok := locator["config"]; !ok {
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      "config",
+			MountPath: "/etc/config",
+		})
+	}
+	if _, ok := locator[fmt.Sprintf("%s-metadata", binding)]; !ok {
 		mounts = append(mounts, corev1.VolumeMount{
 			Name:      fmt.Sprintf("%s-metadata", binding),
 			MountPath: fmt.Sprintf("/config/bindings/%s/metadata", binding),

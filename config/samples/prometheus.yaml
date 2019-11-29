@@ -1,11 +1,8 @@
 apiVersion: spring.io/v1
-kind: Binding
+kind: Microservice
 metadata:
-  name: prometheus
+  name: env
 spec:
-  template:
-    metadata:
-      annotations:
-        prometheus.io/path: /actuator/prometheus
-        prometheus.io/port: "8080"
-        prometheus.io/scrape: "true"
+  image: springguides/demo
+  bindings:
+  - prometheus

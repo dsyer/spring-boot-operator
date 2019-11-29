@@ -68,7 +68,7 @@ func TestCreateDeploymentVanilla(t *testing.T) {
 			Image: "springguides/demo",
 		},
 	}
-	deployment := createDeployment(&micro)
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
 	if deployment.Name != "demo" {
 		t.Errorf("Deployment.Name = %s; want 'demo'", deployment.Name)
 	}
@@ -105,7 +105,7 @@ func TestCreateDeploymentActuators(t *testing.T) {
 			Image:     "springguides/demo",
 		},
 	}
-	deployment := createDeployment(&micro)
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
 	container := deployment.Spec.Template.Spec.Containers[0]
 	if container.LivenessProbe == nil {
 		t.Errorf("Container.LivenessProbe = %s; want not nil", container.LivenessProbe)
@@ -140,7 +140,7 @@ func TestCreateDeploymentExistingAnonymousContainer(t *testing.T) {
 			},
 		},
 	}
-	deployment := createDeployment(&micro)
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
 	}
@@ -182,7 +182,7 @@ func TestCreateDeploymentExistingContainer(t *testing.T) {
 			},
 		},
 	}
-	deployment := createDeployment(&micro)
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
 	}
@@ -209,7 +209,7 @@ func TestCreateDeploymentBindings(t *testing.T) {
 			Bindings: []string{"mysql", "redis"},
 		},
 	}
-	deployment := createDeployment(&micro)
+	deployment := createDeployment(findBindingsToApply(micro, []api.ServiceBinding{}), &micro)
 	if len(deployment.Spec.Template.Spec.Volumes) != 5 {
 		t.Errorf("len(container.VolumeMounts) = %d; want 5", len(deployment.Spec.Template.Spec.Volumes))
 		t.FailNow()
@@ -280,7 +280,7 @@ func TestCreateDeploymentProfiles(t *testing.T) {
 			Profiles: []string{"mysql", "redis"},
 		},
 	}
-	deployment := createDeployment(&micro)
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
 	container := deployment.Spec.Template.Spec.Containers[0]
 	var env corev1.EnvVar
 	for _, item := range container.Env {
@@ -298,6 +298,28 @@ func TestCreateDeploymentProfiles(t *testing.T) {
 
 }
 
+func TestCreateDeploymentAnnotations(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Image: "springguides/demo",
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"foo": "bar"},
+				},
+			},
+		},
+	}
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
+	if deployment.Spec.Template.ObjectMeta.Annotations["foo"] != "bar" {
+		t.Errorf("deployment.Spec.Template.ObjectMeta.Annotations['foo'] = %s; want 'bar'", deployment.Spec.Template.ObjectMeta.Annotations["foo"])
+	}
+
+}
+
 func TestUpdateDeploymentProfiles(t *testing.T) {
 	micro := api.Microservice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -308,13 +330,13 @@ func TestUpdateDeploymentProfiles(t *testing.T) {
 			Image: "springguides/demo",
 		},
 	}
-	deployment := createDeployment(&micro)
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
 	container := deployment.Spec.Template.Spec.Containers[0]
 	if len(container.Env) > 0 {
 		t.Errorf("container.Env should be empty but found %s", container.Env)
 	}
 	micro.Spec.Profiles = []string{"mysql", "redis"}
-	updateDeployment(deployment, &micro)
+	updateDeployment(deployment, []api.ServiceBinding{}, &micro)
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
 	}
@@ -345,19 +367,119 @@ func TestUpdateImage(t *testing.T) {
 			Image: "springguides/demo",
 		},
 	}
-	deployment := createDeployment(&micro)
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
 	container := deployment.Spec.Template.Spec.Containers[0]
 	if container.Image != "springguides/demo" {
 		t.Errorf("Container.Image = %s; want 'springguides/demo'", container.Image)
 	}
 	micro.Spec.Image = "springguides/demo:last"
-	updateDeployment(deployment, &micro)
+	updateDeployment(deployment, []api.ServiceBinding{}, &micro)
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
 	}
 	container = deployment.Spec.Template.Spec.Containers[0]
 	if container.Image != "springguides/demo:last" {
 		t.Errorf("Container.Image = %s; want 'springguides/demo:last'", container.Image)
+	}
+
+}
+
+func TestBindingAnnotations(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Image: "springguides/demo",
+		},
+	}
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
+	if deployment.Spec.Template.ObjectMeta.Annotations["foo"] != "" {
+		t.Errorf("deployment.Spec.Template.ObjectMeta.Annotations['foo'] = %s; want ''", deployment.Spec.Template.ObjectMeta.Annotations["foo"])
+	}
+	bindings := []api.ServiceBinding{
+		api.ServiceBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "mysql",
+			},
+			Spec: api.ServiceBindingSpec{
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+		},
+	}
+	micro.Spec.Bindings = []string{"mysql"}
+	updateDeployment(deployment, bindings, &micro)
+	if deployment.Spec.Template.ObjectMeta.Annotations["foo"] != "bar" {
+		t.Errorf("deployment.Spec.Template.ObjectMeta.Annotations['foo'] = %s; want 'bar'", deployment.Spec.Template.ObjectMeta.Annotations["foo"])
+	}
+
+}
+
+func TestBindingVolumes(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Image: "springguides/demo",
+		},
+	}
+	bindings := []api.ServiceBinding{}
+	deployment := createDeployment(bindings, &micro)
+	if len(deployment.Spec.Template.Spec.Volumes) != 0 {
+		t.Errorf("len(deployment.Spec.Template.Spec.Volumes) = %d; want 0", len(deployment.Spec.Template.Spec.Volumes))
+	}
+	micro.Spec.Bindings = []string{"mysql"}
+	bindings = append(bindings, defaultBinding("mysql", "config"))
+	updateDeployment(deployment, bindings, &micro)
+	if len(deployment.Spec.Template.Spec.Volumes) != 3 {
+		t.Errorf("len(deployment.Spec.Template.Spec.Volumes) = %d; want 3", len(deployment.Spec.Template.Spec.Volumes))
+	}
+	micro.Spec.Bindings = []string{"mysql"}
+	updateDeployment(deployment, bindings, &micro)
+	if len(deployment.Spec.Template.Spec.Volumes) != 3 {
+		t.Errorf("len(deployment.Spec.Template.Spec.Volumes) = %d; want 3", len(deployment.Spec.Template.Spec.Volumes))
+	}
+
+}
+
+func TestBindingPod(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+	}
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
+	if deployment.Spec.Template.Spec.RestartPolicy != "" {
+		t.Errorf("deployment.Spec.Template.Spec.RestartPolicy = %s; want ''", deployment.Spec.Template.Spec.RestartPolicy)
+	}
+	bindings := []api.ServiceBinding{
+		api.ServiceBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "mysql",
+			},
+			Spec: api.ServiceBindingSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyNever,
+					},
+				},
+			},
+		},
+	}
+	micro.Spec.Bindings = []string{"mysql"}
+	updateDeployment(deployment, bindings, &micro)
+	if deployment.Spec.Template.Spec.RestartPolicy != corev1.RestartPolicyNever {
+		t.Errorf("deployment.Spec.Template.Spec.RestartPolicy = %s; want 'Never'", deployment.Spec.Template.Spec.RestartPolicy)
 	}
 
 }

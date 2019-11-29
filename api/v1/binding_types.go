@@ -20,38 +20,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BindingSpec defines the desired state of Binding
-type BindingSpec struct {
+// ServiceBindingSpec defines the desired state of ServiceBinding
+type ServiceBindingSpec struct {
 	Template corev1.PodTemplateSpec `json:"template,omitempty"`
 }
 
-// BindingStatus defines the observed state of Binding
-type BindingStatus struct {
+// ServiceBindingStatus defines the observed state of ServiceBinding
+type ServiceBindingStatus struct {
 	Bound []string `json:"bound,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// Binding is the Schema for the springs API
+// ServiceBinding is the Schema for the springs API
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Bound",type="boolean",JSONPath=".status.bound",description="deployment status"
-type Binding struct {
+// +kubebuilder:printcolumn:name="Bound",type="boolean",JSONPath=".status.bound",description="bound microservices"
+type ServiceBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BindingSpec   `json:"spec,omitempty"`
-	Status BindingStatus `json:"status,omitempty"`
+	Spec   ServiceBindingSpec   `json:"spec,omitempty"`
+	Status ServiceBindingStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// BindingList contains a list of Spring
-type BindingList struct {
+// ServiceBindingList contains a list of Spring
+type ServiceBindingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Binding `json:"items"`
+	Items           []ServiceBinding `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Binding{}, &BindingList{})
+	SchemeBuilder.Register(&ServiceBinding{}, &ServiceBindingList{})
 }

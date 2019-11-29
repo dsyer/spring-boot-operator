@@ -4,25 +4,25 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  name: bindings.spring.io
+  name: servicebindings.spring.io
 spec:
   additionalPrinterColumns:
   - JSONPath: .status.bound
-    description: deployment status
+    description: bound microservices
     name: Bound
     type: boolean
   group: spring.io
   names:
-    kind: Binding
-    listKind: BindingList
-    plural: bindings
-    singular: binding
+    kind: ServiceBinding
+    listKind: ServiceBindingList
+    plural: servicebindings
+    singular: servicebinding
   scope: ""
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: Binding is the Schema for the springs API
+      description: ServiceBinding is the Schema for the springs API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -37,7 +37,7 @@ spec:
         metadata:
           type: object
         spec:
-          description: BindingSpec defines the desired state of Binding
+          description: ServiceBindingSpec defines the desired state of ServiceBinding
           properties:
             template:
               description: PodTemplateSpec describes the data a pod should have when
@@ -4233,7 +4233,7 @@ spec:
               type: object
           type: object
         status:
-          description: BindingStatus defines the observed state of Binding
+          description: ServiceBindingStatus defines the observed state of ServiceBinding
           properties:
             bound:
               items:

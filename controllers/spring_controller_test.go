@@ -438,7 +438,7 @@ func TestBindingVolumes(t *testing.T) {
 		t.Errorf("len(deployment.Spec.Template.Spec.Volumes) = %d; want 0", len(deployment.Spec.Template.Spec.Volumes))
 	}
 	micro.Spec.Bindings = []string{"mysql"}
-	bindings = append(bindings, defaultBinding("mysql", "config"))
+	bindings = append(bindings, defaultBinding("mysql", micro))
 	updateDeployment(deployment, bindings, &micro)
 	if len(deployment.Spec.Template.Spec.Volumes) != 3 {
 		t.Errorf("len(deployment.Spec.Template.Spec.Volumes) = %d; want 3", len(deployment.Spec.Template.Spec.Volumes))

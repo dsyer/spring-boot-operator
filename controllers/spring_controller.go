@@ -85,6 +85,24 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	var bindingsToApply []api.ServiceBinding
 	if len(micro.Spec.Bindings) > 0 {
 		bindingsToApply = findBindingsToApply(micro, bindings.Items)
+		bindingsMap := map[string]api.ServiceBinding{}
+		for _, binding := range bindings.Items {
+			bindingsMap[binding.Name] = binding
+		}
+		for _, binding := range bindingsToApply {
+			if _, ok := bindingsMap[binding.Name]; !ok {
+				if err := r.Create(ctx, &binding); err != nil {
+					log.Error(err, "Unable to create ServiceBinding", "binding", binding)
+					// Not fatal
+				} else {
+					log.Info("Created ServiceBinding", "binding", binding)
+				}
+			}
+		}
+		if err := r.List(ctx, &bindings, client.InNamespace(req.Namespace)); err != nil {
+			log.Error(err, "Unable to list Bindings")
+			// Not fatal
+		}
 	}
 
 	var service *corev1.Service
@@ -181,10 +199,10 @@ func (r *MicroserviceReconciler) updateBindings(bindings api.ServiceBindingList,
 	}
 	ctx := context.Background()
 	log := r.Log.WithValues("microservice", req.NamespacedName)
-	log.Info("Updating binding statuses")
+	log.Info("Updating binding statuses", "bindings", bindings)
 	var micros api.MicroserviceList
 	if err := r.List(ctx, &micros, client.InNamespace(req.Namespace)); err != nil {
-		log.Error(err, "Unable to list child Services")
+		log.Error(err, "Unable to list Microservices")
 		return err
 	}
 	bounds := map[string][]string{}
@@ -217,13 +235,13 @@ func findBindingsToApply(micro api.Microservice, bindings []api.ServiceBinding) 
 		if binding, ok := bindingsMap[name]; ok {
 			bindingsToApply = append(bindingsToApply, binding)
 		} else {
-			bindingsToApply = append(bindingsToApply, defaultBinding(name, micro.Name))
+			bindingsToApply = append(bindingsToApply, defaultBinding(name, micro))
 		}
 	}
 	return bindingsToApply
 }
 
-func defaultBinding(name string, config string) api.ServiceBinding {
+func defaultBinding(name string, micro api.Microservice) api.ServiceBinding {
 	initContainer := corev1.Container{
 		Name: "env",
 	}
@@ -240,7 +258,8 @@ func defaultBinding(name string, config string) api.ServiceBinding {
 			},
 		},
 	}
-	binding.Spec.Template.Spec.Volumes = createVolumes(name, config)
+	binding.Namespace = micro.Namespace
+	binding.Spec.Template.Spec.Volumes = createVolumes(name, micro.Name)
 	setUpInitContainer(&initContainer, name)
 	addVolumeMount(&appContainer)
 	binding.Spec.Template.Spec.Containers = []corev1.Container{

@@ -437,6 +437,7 @@ func setEnvVarsMulti(values []api.EnvVar, name string, value []string) []api.Env
 	if env.Name != name {
 		env.Name = name
 		env.Values = value
+		env.Value = ""
 		values = append(values, env)
 	}
 	return values

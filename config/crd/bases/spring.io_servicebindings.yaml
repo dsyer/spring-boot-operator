@@ -39,6 +39,22 @@ spec:
         spec:
           description: ServiceBindingSpec defines the desired state of ServiceBinding
           properties:
+            env:
+              items:
+                description: EnvVar defines an enironment variable for the app container
+                properties:
+                  name:
+                    type: string
+                  value:
+                    type: string
+                  values:
+                    items:
+                      type: string
+                    type: array
+                required:
+                - name
+                type: object
+              type: array
             template:
               description: PodTemplateSpec describes the data a pod should have when
                 created from a template

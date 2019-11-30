@@ -61,6 +61,27 @@ $ make run
 
 and then the controller will register with your default cluster.
 
+[TIP]
+====
+You may encounter issues with go modules. If you see this:
+
+```
+# sigs.k8s.io/controller-tools/pkg/webhook
+/go/pkg/mod/sigs.k8s.io/controller-tools@v0.2.1/pkg/webhook/parser.go:98:29: undefined: v1beta1.Webhook
+/go/pkg/mod/sigs.k8s.io/controller-tools@v0.2.1/pkg/webhook/parser.go:129:9: undefined: v1beta1.Webhook
+/go/pkg/mod/sigs.k8s.io/controller-tools@v0.2.1/pkg/webhook/parser.go:161:21: undefined: v1beta1.Webhook
+/go/pkg/mod/sigs.k8s.io/controller-tools@v0.2.1/pkg/webhook/parser.go:162:23: undefined: v1beta1.Webhook
+make: *** [Makefile:69: controller-gen] Error 2
+```
+
+try this:
+
+```
+$ (cd .. && GO111MODULE=on go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.1)
+$ make install run
+```
+====
+
 The source code has a VSCode `.devcontainer` definition, so if you use the "Remote Container" extension, you should be able to run in a container. The `devcontainer.json` has comments explaining what to set up on the host (you need to have `docker` running and set up your `~/.kube/config` to talk to your cluster).
 
 == Try it Out
@@ -181,7 +202,7 @@ Each binding is used to search for a `ServiceBinding` of the same name, in the s
 
 === Custom Bindings
 
-A binding carries a patch for the `PodTemplateSpec`. It can add a restart policy, annotations, volumes, containers, and init containers, or it can modify the "app" container. Containers can be patched using the volume mounts, env vars, image, command, args, or working dir properties. For example:
+A binding carries a patch for the `PodTemplateSpec` in the app `Deployment`. It can add a restart policy, annotations, volumes, containers, and init containers, or it can modify the "app" container. Containers can be patched using the volume mounts, env vars, image, command, args, or working dir properties. For example:
 
 ```
 apiVersion: spring.io/v1
@@ -198,6 +219,36 @@ spec:
 ```
 
 This one adds the annotations that are needed by the Prometheus Helm chart installation to pull metrics from the Spring Boot Actuator endpoint.
+
+An additional feature is that a `ServiceBinding` can separately specify environment variables for the main app container, in a form that helps with some of the naming conventions in Spring Boot. In particular it permits environment variables which bind to a string array in Spring Boot to accumulate additional content in multiple `ServiceBindings`. For example, these two bindings applied to a single `Microservice` will expose the `metrics` and `env` Actuator endpoints, in addition to the default `info` and `health`:
+
+```
+apiVersion: spring.io/v1
+kind: ServiceBinding
+metadata:
+  name: metrics
+spec:
+  env:
+  - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+    values:
+    - info
+    - health
+    - metrics
+---
+apiVersion: spring.io/v1
+kind: ServiceBinding
+metadata:
+  name: env
+spec:
+  env:
+  - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+    values:
+    - info
+    - health
+    - env
+```
+
+`EnvVar` entries in a `ServiceBinding` can have a single `value` or multiple `values`. In the case of a single `value` the last one to bind wins. With multiple `values` they are merged and written into the app container as a comma-separated list.
 
 === Default Bindings
 

@@ -265,7 +265,9 @@ func defaultBinding(name string, micro api.Microservice) api.ServiceBinding {
 	binding.Namespace = micro.Namespace
 	binding.Spec.Template.Spec.Volumes = createVolumes(name, micro.Name)
 	setUpInitContainer(&initContainer, name)
-	addVolumeMount(&appContainer)
+	location := "/etc/config/"
+	addVolumeMount(&appContainer, location)
+	addEnvVars(&binding.Spec, location)
 	binding.Spec.Template.Spec.Containers = []corev1.Container{
 		appContainer,
 	}
@@ -273,6 +275,14 @@ func defaultBinding(name string, micro api.Microservice) api.ServiceBinding {
 		initContainer,
 	}
 	return binding
+}
+
+func addEnvVars(spec *api.ServiceBindingSpec, location string) {
+	locations := []string{"classpath:/", "file://" + location}
+	env := spec.Env
+	env = setEnvVars(env, "CNB_BINDINGS", "/config/bindings")
+	env = setEnvVarsMulti(env, "SPRING_CONFIG_LOCATION", locations)
+	spec.Env = env
 }
 
 func createService(micro *api.Microservice) *corev1.Service {
@@ -335,11 +345,47 @@ func updateDeployment(deployment *apps.Deployment, bindings []api.ServiceBinding
 	container := findAppContainer(&deployment.Spec.Template.Spec)
 	setUpAppContainer(container, *micro)
 	addProfiles(container, micro.Spec)
+	mergeEnvVars(container, bindings)
 	if deployment.Spec.Template.ObjectMeta.Labels == nil {
 		deployment.Spec.Template.ObjectMeta.Labels = map[string]string{}
 	}
 	deployment.Spec.Template.ObjectMeta.Labels["app"] = micro.Name
 	return deployment
+}
+
+func mergeEnvVars(container *corev1.Container, bindings []api.ServiceBinding) {
+	singles := map[string]string{}
+	multis := map[string][]string{}
+	for _, binding := range bindings {
+		for _, value := range binding.Spec.Env {
+			if value.Value != "" {
+				singles[value.Name] = value.Value
+			} else if len(value.Values) > 0 {
+				multis[value.Name] = append(multis[value.Name], value.Values...)
+			}
+		}
+	}
+	for k, v := range multis {
+		multis[k] = unique(v)
+	}
+	env := container.Env
+	for _, value := range env {
+		name := value.Name
+		if singles[name] != "" {
+			// Default to container spec if value is set there
+			delete(singles, name)
+			continue
+		}
+		// Append bindings onto CSV values supplied in container
+		multis[name] = unique(append(strings.Split(value.Value, ","), multis[name]...))
+	}
+	for key, value := range singles {
+		env = setEnvVar(env, key, value)
+	}
+	for key, value := range multis {
+		env = setEnvVar(env, key, strings.Join(value, ","))
+	}
+	container.Env = env
 }
 
 func addProfiles(container *corev1.Container, spec api.MicroserviceSpec) {
@@ -364,8 +410,52 @@ func setEnvVar(values []corev1.EnvVar, name string, value string) []corev1.EnvVa
 	return values
 }
 
-func addVolumeMount(container *corev1.Container) {
-	location := "/etc/config/"
+func setEnvVars(values []api.EnvVar, name string, value string) []api.EnvVar {
+	var env api.EnvVar
+	for _, env = range values {
+		if env.Name == name {
+			env.Value = value
+			break
+		}
+	}
+	if env.Name != name {
+		env.Name = name
+		env.Value = value
+		values = append(values, env)
+	}
+	return values
+}
+
+func setEnvVarsMulti(values []api.EnvVar, name string, value []string) []api.EnvVar {
+	var env api.EnvVar
+	for _, env = range values {
+		if env.Name == name {
+			env.Values = unique(append(env.Values, value...))
+			break
+		}
+	}
+	if env.Name != name {
+		env.Name = name
+		env.Values = value
+		values = append(values, env)
+	}
+	return values
+}
+
+func unique(values []string) []string {
+	sifted := map[string]bool{}
+	result := []string{}
+	for _, value := range values {
+		if _, ok := sifted[value]; ok {
+			continue
+		}
+		sifted[value] = true
+		result = append(result, value)
+	}
+	return result
+}
+
+func addVolumeMount(container *corev1.Container, location string) {
 	mounts := container.VolumeMounts
 	locator := map[string]corev1.VolumeMount{}
 	for _, volume := range mounts {
@@ -377,11 +467,6 @@ func addVolumeMount(container *corev1.Container) {
 			MountPath: location,
 		})
 	}
-	locations := []string{"classpath:/", "file://" + location}
-	env := container.Env
-	env = setEnvVar(env, "CNB_BINDINGS", "/config/bindings")
-	env = setEnvVar(env, "SPRING_CONFIG_LOCATION", strings.Join(locations, ","))
-	container.Env = env
 	container.VolumeMounts = mounts
 }
 
@@ -457,7 +542,6 @@ func setUpAppContainer(container *corev1.Container, micro api.Microservice) {
 			}
 		}
 	}
-
 }
 
 // Find the container that runs the app image

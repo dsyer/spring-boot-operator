@@ -451,6 +451,22 @@ func TestBindingVolumes(t *testing.T) {
 
 }
 
+func TestDefaultBindingEnvVars(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Image: "springguides/demo",
+		},
+	}
+	binding := defaultBinding("mysql", micro)
+	if len(binding.Spec.Env) != 2 {
+		t.Errorf("len(binding.Spec.Env) = %d; want 2", len(binding.Spec.Env))
+	}
+}
+
 func TestBindingPod(t *testing.T) {
 	micro := api.Microservice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -483,3 +499,52 @@ func TestBindingPod(t *testing.T) {
 	}
 
 }
+
+func TestBindingEnvVars(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Bindings: []string{"mysql", "other"},
+		},
+	}
+	bindings := []api.ServiceBinding{
+		api.ServiceBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "mysql",
+			},
+			Spec: api.ServiceBindingSpec{
+				Env: []api.EnvVar{
+					api.EnvVar{Name: "FOO", Value: "bar"},
+					api.EnvVar{Name: "SPLAT", Values: []string{"one", "two"}},
+					api.EnvVar{Name: "BAR", Value: "spam"},
+				},
+			},
+		},
+		api.ServiceBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "other",
+			},
+			Spec: api.ServiceBindingSpec{
+				Env: []api.EnvVar{
+					api.EnvVar{Name: "SPLAT", Values: []string{"one", "three"}},
+				},
+			},
+		},
+	}
+	deployment := createDeployment(bindings, &micro)
+	container := deployment.Spec.Template.Spec.Containers[0]
+	if findEnvByName(container.Env, "FOO").Value != "bar" {
+		t.Errorf("container.Env[FOO] = %s; want 'bar'", container.Env)
+	}
+	if findEnvByName(container.Env, "BAR").Value != "spam" {
+		t.Errorf("container.Env[BAR] = %s; want 'spam'", container.Env)
+	}
+	if findEnvByName(container.Env, "SPLAT").Value != "one,two,three" {
+		t.Errorf("container.Env[SPLAT] = %s; want 'one,two,three'", container.Env)
+	}
+}
+
+// mergeEnvVars

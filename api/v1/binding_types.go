@@ -20,8 +20,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// EnvVar defines an enironment variable for the app container
+type EnvVar struct {
+	Name   string   `json:"name"`
+	Value  string   `json:"value,omitempty"`
+	Values []string `json:"values,omitempty"`
+}
+
 // ServiceBindingSpec defines the desired state of ServiceBinding
 type ServiceBindingSpec struct {
+	Env      []EnvVar               `json:"env,omitempty"`
 	Template corev1.PodTemplateSpec `json:"template,omitempty"`
 }
 

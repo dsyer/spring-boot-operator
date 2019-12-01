@@ -3,6 +3,14 @@ kind: ServiceBinding
 metadata:
   name: test
 spec:
+  env:
+  - name: SPRING_CONFIG_LOCATION
+    values:
+    - classpath:/
+    - file:///etc/config/
+  - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+    values:
+    - '*'
   template:
     spec:
       initContainers:
@@ -21,11 +29,6 @@ spec:
         volumeMounts:
         - name: config
           mountPath: /etc/config
-        env:
-        - name: SPRING_CONFIG_LOCATION
-          value: classpath:/,file:///etc/config/
-        - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
-          value: '*'
       volumes:
       - name: test-metadata
         configMap:

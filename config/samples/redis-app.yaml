@@ -1,0 +1,8 @@
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: redis-app
+spec:
+  image: dsyer/redis-app
+  bindings:
+  - redis

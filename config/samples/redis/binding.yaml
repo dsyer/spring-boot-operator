@@ -1,0 +1,38 @@
+apiVersion: spring.io/v1
+kind: ServiceBinding
+metadata:
+  name: redis
+spec:
+  env:
+  - name: SPRING_CONFIG_LOCATION
+    values:
+    - classpath:/
+    - file:///etc/config/
+  - name: MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS
+    value: always
+  template:
+    spec:
+      initContainers:
+      - name: env
+        image: dsyer/spring-boot-bindings
+        args: ["-f", "/etc/config/application.properties", "/config/bindings"]
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+        - name: redis-metadata
+          mountPath: /config/bindings/redis/metadata
+        - name: redis-metadata
+          mountPath: /config/templates/redis
+      containers:
+      - name: app
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+      volumes:
+      - name: redis-metadata
+        configMap:
+          name: redis-metadata
+      - name: config
+        emptyDir: {}
+
+

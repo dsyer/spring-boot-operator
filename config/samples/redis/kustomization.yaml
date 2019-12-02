@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - binding.yaml
+  - config.yaml
+configMapGenerator:
+  - name: redis-metadata
+    behavior: merge
+    literals:
+      - kind=redis
+      - provider=dsyer
+      - |
+        tags=redis
+        cache
+      # Has to be a config map (not a secret) because of kustomize vars restrictions
+      - host=$(REDIS_HOST)
+    files:
+    - application.properties.tmpl
+vars:
+  - name: REDIS_HOST
+    objref:
+      apiVersion: v1
+      kind: Service
+      name: redis
+configurations:
+  - varreference.yaml

@@ -505,9 +505,7 @@ func createVolumes(binding string, config string) []corev1.Volume {
 	volumes = append(volumes, corev1.Volume{
 		Name: "config",
 		VolumeSource: corev1.VolumeSource{
-			HostPath: &corev1.HostPathVolumeSource{
-				Path: "/data/" + config, // TODO: include uniqueness?
-			},
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
 		},
 	})
 	return volumes

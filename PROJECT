@@ -1,6 +1,6 @@
 version: "2"
 domain: spring.io
-repo: github.com/dsyer/sample-controller
+repo: github.com/dsyer/spring-boot-operator
 resources:
 - group: spring.io
   version: v1

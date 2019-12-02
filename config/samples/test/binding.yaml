@@ -34,7 +34,6 @@ spec:
         configMap:
           name: test-metadata
       - name: config
-        hostPath:
-          path: /data
+        emptyDir: {}
 
 

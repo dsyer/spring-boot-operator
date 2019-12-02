@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	api "github.com/dsyer/sample-controller/api/v1"
+	api "github.com/dsyer/spring-boot-operator/api/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"

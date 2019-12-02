@@ -16,7 +16,7 @@ limitations under the License.
 package controllers
 
 import (
-	api "github.com/dsyer/sample-controller/api/v1"
+	api "github.com/dsyer/spring-boot-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"

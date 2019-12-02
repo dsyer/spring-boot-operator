@@ -1,4 +1,4 @@
-module github.com/dsyer/sample-controller
+module github.com/dsyer/spring-boot-operator
 
 go 1.13
 

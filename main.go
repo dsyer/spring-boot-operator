@@ -19,8 +19,8 @@ import (
 	"flag"
 	"os"
 
-	api "github.com/dsyer/sample-controller/api/v1"
-	"github.com/dsyer/sample-controller/controllers"
+	api "github.com/dsyer/spring-boot-operator/api/v1"
+	"github.com/dsyer/spring-boot-operator/controllers"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"

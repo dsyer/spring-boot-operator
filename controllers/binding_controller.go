@@ -26,7 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/dsyer/sample-controller/api/v1"
+	api "github.com/dsyer/spring-boot-operator/api/v1"
 )
 
 // ServiceBindingReconciler reconciles a ServiceBinding object

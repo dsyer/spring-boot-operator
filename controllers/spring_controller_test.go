@@ -371,7 +371,7 @@ func TestUpdateDeploymentEnvVars(t *testing.T) {
 						corev1.Container{
 							Env: []corev1.EnvVar{
 								corev1.EnvVar{
-									Name: "FOO",
+									Name:  "FOO",
 									Value: "BAR",
 								},
 							},
@@ -391,8 +391,8 @@ func TestUpdateDeploymentEnvVars(t *testing.T) {
 		api.ServiceBinding{
 			Spec: api.ServiceBindingSpec{
 				Env: []api.EnvVar{
-					api.EnvVar {
-						Name: "BAR",
+					api.EnvVar{
+						Name:   "BAR",
 						Values: []string{"one", "two"},
 					},
 				},

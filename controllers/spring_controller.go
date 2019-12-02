@@ -341,7 +341,7 @@ func updateDeployment(deployment *apps.Deployment, bindings []api.ServiceBinding
 	defaults := findAppContainer(&micro.Spec.Template.Spec)
 	if len(micro.Spec.Template.Spec.Containers) == 1 && defaults.Name == "" {
 		// If there is only one container and it is anonymous, then it is the app container
-		micro.Spec.Template.Spec.Containers[0].Name= "app"
+		micro.Spec.Template.Spec.Containers[0].Name = "app"
 		defaults.Name = "app"
 	}
 	for _, binding := range bindings {

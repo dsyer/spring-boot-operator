@@ -21,7 +21,6 @@ import (
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -69,7 +68,13 @@ func (r *ServiceBindingReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 			log.Info("Empty containers.")
 			micro.Spec.Template.Spec.Containers = []v1.Container{}
 		}
-		micro.ObjectMeta.CreationTimestamp = metav1.Time{}
+		annos := micro.ObjectMeta.GetAnnotations()
+		// Add an annotation to jog the API server to update the deployment if necessary
+		if annos["spring.io/active"] == "red" {
+			annos["spring.io/active"] = "black"
+		} else {
+			annos["spring.io/active"] = "red"
+		}
 		if err := r.Update(ctx, &micro); err != nil {
 			if apierrors.IsConflict(err) {
 				log.Info("Unable to update Microservice: reason conflict. Will retry on next event.")

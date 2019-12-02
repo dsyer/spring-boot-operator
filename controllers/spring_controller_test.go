@@ -357,6 +357,79 @@ func TestUpdateDeploymentProfiles(t *testing.T) {
 
 }
 
+func TestUpdateDeploymentEnvVars(t *testing.T) {
+	micro := api.Microservice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "test",
+		},
+		Spec: api.MicroserviceSpec{
+			Image: "springguides/demo",
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Env: []corev1.EnvVar{
+								corev1.EnvVar{
+									Name: "FOO",
+									Value: "BAR",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	deployment := createDeployment([]api.ServiceBinding{}, &micro)
+	container := deployment.Spec.Template.Spec.Containers[0]
+	if len(container.Env) != 1 {
+		t.Errorf("container.Env should have 1 element but found %s", container.Env)
+	}
+	micro.Spec.Profiles = []string{"mysql"}
+	updateDeployment(deployment, []api.ServiceBinding{
+		api.ServiceBinding{
+			Spec: api.ServiceBindingSpec{
+				Env: []api.EnvVar{
+					api.EnvVar {
+						Name: "BAR",
+						Values: []string{"one", "two"},
+					},
+				},
+			},
+		},
+	}, &micro)
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
+	}
+	container = deployment.Spec.Template.Spec.Containers[0]
+	var env corev1.EnvVar
+	for _, item := range container.Env {
+		if item.Name == "SPRING_PROFILES_ACTIVE" {
+			env = item
+			break
+		}
+	}
+	if env.Name == "" {
+		t.Errorf("container.Env should contain 'SPRING_PROFILES_ACTIVE', but was %s", container.Env)
+	}
+	if env.Value != "mysql" {
+		t.Errorf("SPRING_PROFILES_ACTIVE should contain 'mysql', found %s", env.Value)
+	}
+	for _, item := range container.Env {
+		if item.Name == "BAR" {
+			env = item
+			break
+		}
+	}
+	if env.Name == "" {
+		t.Errorf("container.Env should contain 'BAR', but was %s", container.Env)
+	}
+	if env.Value != "one,two" {
+		t.Errorf("BAR should contain 'one,two', found %s", env.Value)
+	}
+}
+
 func TestUpdateImage(t *testing.T) {
 	micro := api.Microservice{
 		ObjectMeta: metav1.ObjectMeta{

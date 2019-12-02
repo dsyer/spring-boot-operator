@@ -10,7 +10,7 @@ spec:
     - file:///etc/config/
   - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
     values:
-    - '*'
+    -  '*'
   template:
     spec:
       initContainers:

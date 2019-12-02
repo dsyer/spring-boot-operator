@@ -338,14 +338,22 @@ func createDeployment(bindings []api.ServiceBinding, micro *api.Microservice) *a
 }
 
 func updateDeployment(deployment *apps.Deployment, bindings []api.ServiceBinding, micro *api.Microservice) *apps.Deployment {
+	defaults := findAppContainer(&micro.Spec.Template.Spec)
+	if len(micro.Spec.Template.Spec.Containers) == 1 && defaults.Name == "" {
+		// If there is only one container and it is anonymous, then it is the app container
+		micro.Spec.Template.Spec.Containers[0].Name= "app"
+		defaults.Name = "app"
+	}
 	for _, binding := range bindings {
 		mergePodTemplates(binding.Spec.Template, &deployment.Spec.Template)
 	}
 	mergePodTemplates(micro.Spec.Template, &deployment.Spec.Template)
 	container := findAppContainer(&deployment.Spec.Template.Spec)
 	setUpAppContainer(container, *micro)
-	addProfiles(container, micro.Spec)
+	// Reset all env vars so any deletions get picked up in the merge
+	container.Env = defaults.Env
 	mergeEnvVars(container, bindings)
+	addProfiles(container, micro.Spec)
 	if deployment.Spec.Template.ObjectMeta.Labels == nil {
 		deployment.Spec.Template.ObjectMeta.Labels = map[string]string{}
 	}
@@ -358,10 +366,10 @@ func mergeEnvVars(container *corev1.Container, bindings []api.ServiceBinding) {
 	multis := map[string][]string{}
 	for _, binding := range bindings {
 		for _, value := range binding.Spec.Env {
-			if value.Value != "" {
-				singles[value.Name] = value.Value
-			} else if len(value.Values) > 0 {
+			if len(value.Values) > 0 {
 				multis[value.Name] = append(multis[value.Name], value.Values...)
+			} else if value.Value != "" {
+				singles[value.Name] = value.Value
 			}
 		}
 	}
@@ -396,9 +404,11 @@ func addProfiles(container *corev1.Container, spec api.MicroserviceSpec) {
 
 func setEnvVar(values []corev1.EnvVar, name string, value string) []corev1.EnvVar {
 	var env corev1.EnvVar
-	for _, env = range values {
+	var index int
+	for index, env = range values {
 		if env.Name == name {
 			env.Value = value
+			values[index] = env
 			break
 		}
 	}
@@ -552,7 +562,7 @@ func findAppContainer(pod *corev1.PodSpec) *corev1.Container {
 		container = &pod.Containers[0]
 	} else {
 		for _, candidate := range pod.Containers {
-			if container.Name == "app" {
+			if candidate.Name == "app" {
 				container = &candidate
 				break
 			}

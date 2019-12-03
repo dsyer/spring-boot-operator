@@ -1,0 +1,8 @@
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: kafka-app
+spec:
+  image: dsyer/kafka-app
+  bindings:
+  - kafka

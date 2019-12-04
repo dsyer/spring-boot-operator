@@ -23,6 +23,7 @@ import (
 // MicroserviceSpec defines the desired state of Microservice
 type MicroserviceSpec struct {
 	Image     string                 `json:"image,omitempty"`
+	Args      []string               `json:"args,omitempty"`
 	Actuators bool                   `json:"actuators,omitempty"`
 	Template  corev1.PodTemplateSpec `json:"template,omitempty"`
 	Bindings  []string               `json:"bindings,omitempty"`

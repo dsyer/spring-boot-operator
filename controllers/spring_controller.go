@@ -615,6 +615,9 @@ func (r *MicroserviceReconciler) constructDeployment(bindings []api.ServiceBindi
 func setUpAppContainer(container *corev1.Container, micro api.Microservice) {
 	container.Name = "app"
 	container.Image = micro.Spec.Image
+	if len(micro.Spec.Args)>0 {
+		container.Args = micro.Spec.Args
+	}
 	if micro.Spec.Actuators {
 		if container.LivenessProbe == nil {
 			container.LivenessProbe = &corev1.Probe{

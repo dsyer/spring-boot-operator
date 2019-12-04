@@ -50,6 +50,7 @@ type MicroserviceReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create;update;patch;delete
 
 var (
 	ownerKey = ".metadata.controller"
@@ -133,6 +134,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 		if err := r.Create(ctx, deployment); err != nil {
 			log.Error(err, "Unable to create Deployment for micro", "deployment", deployment)
+			r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not create Deployment: %s", err))
 			return ctrl.Result{}, err
 		}
 
@@ -148,7 +150,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 				err = nil
 			} else {
 				log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
-				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not create Deployment: %s", err))
+				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Deployment: %s", err))
 			}
 			return ctrl.Result{}, err
 		}
@@ -181,6 +183,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 				err = nil
 			} else {
 				log.Error(err, "Unable to update Service for micro", "service", service)
+				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Service: %s", err))
 			}
 			return ctrl.Result{}, err
 		}

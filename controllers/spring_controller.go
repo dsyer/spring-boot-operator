@@ -44,6 +44,8 @@ type MicroserviceReconciler struct {
 // +kubebuilder:rbac:groups=spring.io,resources=servicebindings/status,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=spring.io,resources=microservices,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=spring.io,resources=microservices/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
@@ -606,23 +608,23 @@ func setUpAppContainer(container *corev1.Container, micro api.Microservice) {
 			container.LivenessProbe = &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/actuator/health",
+						Path: "/actuator/info",
 						Port: intstr.FromInt(8080),
 					},
 				},
-				InitialDelaySeconds: 10,
-				PeriodSeconds:       3,
+				InitialDelaySeconds: 30,
+				PeriodSeconds:       10,
 			}
 		}
 		if container.ReadinessProbe == nil {
 			container.ReadinessProbe = &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/actuator/info",
+						Path: "/actuator/health",
 						Port: intstr.FromInt(8080),
 					},
 				},
-				InitialDelaySeconds: 20,
+				InitialDelaySeconds: 10,
 				PeriodSeconds:       10,
 			}
 		}

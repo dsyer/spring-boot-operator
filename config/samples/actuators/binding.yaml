@@ -1,0 +1,21 @@
+apiVersion: spring.io/v1
+kind: ServiceBinding
+metadata:
+  name: actuators
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          livenessProbe:
+            httpGet:
+              path: /actuator/info
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 11
+          readinessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 13
+            httpGet:
+              path: /actuator/health
+              port: 8080

@@ -51,6 +51,8 @@ type MicroserviceReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="batch/v1",resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="batch/v1beta1",resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 
 var (
 	ownerKey = ".metadata.controller"
@@ -143,7 +145,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	} else {
 		// update if changed
 		deployment = &deployments.Items[0]
-		deployment.Spec.Template = *updateDeployment(&deployment.Spec.Template, bindingsToApply, &micro)
+		deployment.Spec.Template = *updatePodTemplate(&deployment.Spec.Template, bindingsToApply, &micro)
 		if err := r.Update(ctx, deployment); err != nil {
 			if apierrors.IsConflict(err) {
 				log.Info("Unable to update Deployment: reason conflict. Will retry on next event.")
@@ -336,9 +338,6 @@ func findBindingsToApply(micro api.Microservice, bindingsMap map[string]api.Serv
 }
 
 func defaultBinding(name string, micro api.Microservice) api.ServiceBinding {
-	initContainer := corev1.Container{
-		Name: "env",
-	}
 	appContainer := corev1.Container{
 		Name: "app",
 	}
@@ -353,14 +352,43 @@ func defaultBinding(name string, micro api.Microservice) api.ServiceBinding {
 		},
 	}
 	binding.Namespace = micro.Namespace
+	if name == "actuators" {
+		appContainer.LivenessProbe = &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/actuator/info",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       11,
+		}
+		appContainer.ReadinessProbe = &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/actuator/health",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       13,
+		}
+		binding.Spec.Template.Spec.Containers = []corev1.Container{
+			appContainer,
+		}
+		return binding
+	}
 	binding.Spec.Template.Spec.Volumes = createVolumes(name, micro.Name)
-	setUpInitContainer(&initContainer, name)
 	location := "/etc/config/"
 	addVolumeMount(&appContainer, location)
 	addEnvVars(&binding.Spec, location)
 	binding.Spec.Template.Spec.Containers = []corev1.Container{
 		appContainer,
 	}
+	initContainer := corev1.Container{
+		Name: "env",
+	}
+	setUpInitContainer(&initContainer, name)
 	binding.Spec.Template.Spec.InitContainers = []corev1.Container{
 		initContainer,
 	}
@@ -423,11 +451,11 @@ func createDeployment(bindings []api.ServiceBinding, micro *api.Microservice) *a
 			Template: corev1.PodTemplateSpec{},
 		},
 	}
-	deployment.Spec.Template = *updateDeployment(&deployment.Spec.Template, bindings, micro)
+	deployment.Spec.Template = *updatePodTemplate(&deployment.Spec.Template, bindings, micro)
 	return deployment
 }
 
-func updateDeployment(template *corev1.PodTemplateSpec, bindings []api.ServiceBinding, micro *api.Microservice) *corev1.PodTemplateSpec {
+func updatePodTemplate(template *corev1.PodTemplateSpec, bindings []api.ServiceBinding, micro *api.Microservice) *corev1.PodTemplateSpec {
 	defaults := findAppContainer(&micro.Spec.Template.Spec)
 	if len(micro.Spec.Template.Spec.Containers) == 1 && defaults.Name == "" {
 		// If there is only one container and it is anonymous, then it is the app container
@@ -611,38 +639,12 @@ func (r *MicroserviceReconciler) constructDeployment(bindings []api.ServiceBindi
 	return deployment, nil
 }
 
-// Set up the app container, setting the image, adding probes etc.
+// Set up the app container, setting the image, adding args etc.
 func setUpAppContainer(container *corev1.Container, micro api.Microservice) {
 	container.Name = "app"
 	container.Image = micro.Spec.Image
 	if len(micro.Spec.Args) > 0 {
 		container.Args = micro.Spec.Args
-	}
-	if micro.Spec.Actuators {
-		if container.LivenessProbe == nil {
-			container.LivenessProbe = &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/actuator/info",
-						Port: intstr.FromInt(8080),
-					},
-				},
-				InitialDelaySeconds: 30,
-				PeriodSeconds:       10,
-			}
-		}
-		if container.ReadinessProbe == nil {
-			container.ReadinessProbe = &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/actuator/health",
-						Port: intstr.FromInt(8080),
-					},
-				},
-				InitialDelaySeconds: 10,
-				PeriodSeconds:       10,
-			}
-		}
 	}
 }
 

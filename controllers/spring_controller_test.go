@@ -101,11 +101,11 @@ func TestCreateDeploymentActuators(t *testing.T) {
 			Namespace: "test",
 		},
 		Spec: api.MicroserviceSpec{
-			Actuators: true,
-			Image:     "springguides/demo",
+			Bindings: []string{"actuators"},
+			Image:    "springguides/demo",
 		},
 	}
-	deployment := createDeployment([]api.ServiceBinding{}, &micro)
+	deployment := createDeployment([]api.ServiceBinding{defaultBinding("actuators", micro)}, &micro)
 	container := deployment.Spec.Template.Spec.Containers[0]
 	if container.LivenessProbe == nil {
 		t.Errorf("Container.LivenessProbe = %s; want not nil", container.LivenessProbe)
@@ -336,7 +336,7 @@ func TestUpdateDeploymentProfiles(t *testing.T) {
 		t.Errorf("container.Env should be empty but found %s", container.Env)
 	}
 	micro.Spec.Profiles = []string{"mysql", "redis"}
-	updateDeployment(&deployment.Spec.Template, []api.ServiceBinding{}, &micro)
+	updatePodTemplate(&deployment.Spec.Template, []api.ServiceBinding{}, &micro)
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
 	}
@@ -387,7 +387,7 @@ func TestUpdateDeploymentEnvVars(t *testing.T) {
 		t.Errorf("container.Env should have 1 element but found %s", container.Env)
 	}
 	micro.Spec.Profiles = []string{"mysql"}
-	updateDeployment(&deployment.Spec.Template, []api.ServiceBinding{
+	updatePodTemplate(&deployment.Spec.Template, []api.ServiceBinding{
 		api.ServiceBinding{
 			Spec: api.ServiceBindingSpec{
 				Env: []api.EnvVar{
@@ -446,7 +446,7 @@ func TestUpdateImage(t *testing.T) {
 		t.Errorf("Container.Image = %s; want 'springguides/demo'", container.Image)
 	}
 	micro.Spec.Image = "springguides/demo:last"
-	updateDeployment(&deployment.Spec.Template, []api.ServiceBinding{}, &micro)
+	updatePodTemplate(&deployment.Spec.Template, []api.ServiceBinding{}, &micro)
 	if len(deployment.Spec.Template.Spec.Containers) != 1 {
 		t.Errorf("len(Containers) = %d; want 1", len(deployment.Spec.Template.Spec.Containers))
 	}
@@ -488,7 +488,7 @@ func TestBindingAnnotations(t *testing.T) {
 		},
 	}
 	micro.Spec.Bindings = []string{"mysql"}
-	updateDeployment(&deployment.Spec.Template, bindings, &micro)
+	updatePodTemplate(&deployment.Spec.Template, bindings, &micro)
 	if deployment.Spec.Template.ObjectMeta.Annotations["foo"] != "bar" {
 		t.Errorf("deployment.Spec.Template.ObjectMeta.Annotations['foo'] = %s; want 'bar'", deployment.Spec.Template.ObjectMeta.Annotations["foo"])
 	}
@@ -512,12 +512,12 @@ func TestBindingVolumes(t *testing.T) {
 	}
 	micro.Spec.Bindings = []string{"mysql"}
 	bindings = append(bindings, defaultBinding("mysql", micro))
-	updateDeployment(&deployment.Spec.Template, bindings, &micro)
+	updatePodTemplate(&deployment.Spec.Template, bindings, &micro)
 	if len(deployment.Spec.Template.Spec.Volumes) != 3 {
 		t.Errorf("len(deployment.Spec.Template.Spec.Volumes) = %d; want 3", len(deployment.Spec.Template.Spec.Volumes))
 	}
 	micro.Spec.Bindings = []string{"mysql"}
-	updateDeployment(&deployment.Spec.Template, bindings, &micro)
+	updatePodTemplate(&deployment.Spec.Template, bindings, &micro)
 	if len(deployment.Spec.Template.Spec.Volumes) != 3 {
 		t.Errorf("len(deployment.Spec.Template.Spec.Volumes) = %d; want 3", len(deployment.Spec.Template.Spec.Volumes))
 	}
@@ -566,7 +566,7 @@ func TestBindingPod(t *testing.T) {
 		},
 	}
 	micro.Spec.Bindings = []string{"mysql"}
-	updateDeployment(&deployment.Spec.Template, bindings, &micro)
+	updatePodTemplate(&deployment.Spec.Template, bindings, &micro)
 	if deployment.Spec.Template.Spec.RestartPolicy != corev1.RestartPolicyNever {
 		t.Errorf("deployment.Spec.Template.Spec.RestartPolicy = %s; want 'Never'", deployment.Spec.Template.Spec.RestartPolicy)
 	}

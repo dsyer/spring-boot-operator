@@ -6,5 +6,6 @@ spec:
   image: dsyer/demo
   bindings:
   - services/mysql
+  - services/actuators
   profiles:
   - mysql

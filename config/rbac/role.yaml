@@ -67,6 +67,30 @@ rules:
   - update
   - watch
 - apiGroups:
+  - batch/v1
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch/v1beta1
+  resources:
+  - cronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - spring.io
   resources:
   - microservices

@@ -4,4 +4,4 @@ metadata:
   name: actr
 spec:
   image: springguides/demo
-  actuators: true
+  bindings: actuators

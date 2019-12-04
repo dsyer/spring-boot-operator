@@ -43,8 +43,6 @@ spec:
         spec:
           description: MicroserviceSpec defines the desired state of Microservice
           properties:
-            actuators:
-              type: boolean
             args:
               items:
                 type: string

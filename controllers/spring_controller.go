@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,8 +37,9 @@ import (
 // MicroserviceReconciler reconciles a Microservice object
 type MicroserviceReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=spring.io,resources=servicebindings,verbs=get;list;watch;create;update;patch;delete
@@ -100,12 +102,14 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		for _, binding := range bindingsToApply {
 			if _, ok := bindingsMap[fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)]; !ok {
 				if err := r.Create(ctx, &binding); err != nil {
-					log.Error(err, "Unable to create ServiceBinding", "binding", binding)
-					// Not fatal
-				} else {
-					createdNewBindings = true
-					log.Info("Created ServiceBinding", "binding", binding)
+					log.Info("Unable to create default ServiceBinding", "binding", binding)
+					msg := fmt.Sprintf("Unable to create service binding: %s", err)
+					r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrResourceInvalid", msg)
+					return ctrl.Result{}, err
 				}
+				createdNewBindings = true
+				log.Info("Created ServiceBinding", "binding", binding)
+				r.Recorder.Event(&micro, corev1.EventTypeNormal, "ResourceCreated", fmt.Sprintf("Created ServiceBinding: %s", binding.Name))
 			}
 		}
 		if createdNewBindings {
@@ -133,6 +137,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 
 		log.Info("Created Deployments for micro", "deployment", deployment)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "DeploymentCreated", "Created Deployment")
 	} else {
 		// update if changed
 		deployment = &deployments.Items[0]
@@ -143,11 +148,13 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 				err = nil
 			} else {
 				log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
+				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not create Deployment: %s", err))
 			}
 			return ctrl.Result{}, err
 		}
 
 		log.Info("Updated Deployments for micro", "deployment", deployment)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "DeploymentUpdated", "Updated Deployment")
 	}
 
 	log.Info("Found services", "services", len(services.Items))
@@ -163,6 +170,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 
 		log.Info("Created Service for micro", "service", service)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "ServiceCreated", "Created Service")
 	} else {
 		// update if changed
 		service = &services.Items[0]
@@ -178,6 +186,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 
 		log.Info("Updated Service for micro", "service", service)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "ServiceUpdated", "Updated Service")
 	}
 
 	micro.Status.ServiceName = service.GetName()

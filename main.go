@@ -21,11 +21,15 @@ import (
 
 	api "github.com/dsyer/spring-boot-operator/api/v1"
 	"github.com/dsyer/spring-boot-operator/controllers"
+	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
@@ -67,9 +71,10 @@ func main() {
 	}
 
 	if err = (&controllers.MicroserviceReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Microservice"),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("Microservice"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: createRecorder(ctrl.Log.WithName("controllers").WithName("Microservice"), mgr),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Microservice")
 		os.Exit(1)
@@ -89,4 +94,14 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func createRecorder(log logr.Logger, mgr ctrl.Manager) record.EventRecorder {
+	config := mgr.GetConfig()
+	kubeclientset, _ := kubernetes.NewForConfig(config)
+	eventBroadcaster := record.NewBroadcaster()
+	// eventBroadcaster.StartLogging(log.Info)
+	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(clientgoscheme.Scheme, corev1.EventSource{Component: "spring-boot-operator"})
+	return recorder
 }

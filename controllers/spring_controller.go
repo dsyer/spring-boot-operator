@@ -143,7 +143,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	} else {
 		// update if changed
 		deployment = &deployments.Items[0]
-		deployment = updateDeployment(deployment, bindingsToApply, &micro)
+		deployment.Spec.Template = *updateDeployment(&deployment.Spec.Template, bindingsToApply, &micro)
 		if err := r.Update(ctx, deployment); err != nil {
 			if apierrors.IsConflict(err) {
 				log.Info("Unable to update Deployment: reason conflict. Will retry on next event.")
@@ -423,11 +423,11 @@ func createDeployment(bindings []api.ServiceBinding, micro *api.Microservice) *a
 			Template: corev1.PodTemplateSpec{},
 		},
 	}
-	deployment = updateDeployment(deployment, bindings, micro)
+	deployment.Spec.Template = *updateDeployment(&deployment.Spec.Template, bindings, micro)
 	return deployment
 }
 
-func updateDeployment(deployment *apps.Deployment, bindings []api.ServiceBinding, micro *api.Microservice) *apps.Deployment {
+func updateDeployment(template *corev1.PodTemplateSpec, bindings []api.ServiceBinding, micro *api.Microservice) *corev1.PodTemplateSpec {
 	defaults := findAppContainer(&micro.Spec.Template.Spec)
 	if len(micro.Spec.Template.Spec.Containers) == 1 && defaults.Name == "" {
 		// If there is only one container and it is anonymous, then it is the app container
@@ -435,20 +435,20 @@ func updateDeployment(deployment *apps.Deployment, bindings []api.ServiceBinding
 		defaults.Name = "app"
 	}
 	for _, binding := range bindings {
-		mergePodTemplates(binding.Spec.Template, &deployment.Spec.Template)
+		mergePodTemplates(binding.Spec.Template, template)
 	}
-	mergePodTemplates(micro.Spec.Template, &deployment.Spec.Template)
-	container := findAppContainer(&deployment.Spec.Template.Spec)
+	mergePodTemplates(micro.Spec.Template, template)
+	container := findAppContainer(&template.Spec)
 	setUpAppContainer(container, *micro)
 	// Reset all env vars so any deletions get picked up in the merge
 	container.Env = defaults.Env
 	mergeEnvVars(container, bindings)
 	addProfiles(container, micro.Spec)
-	if deployment.Spec.Template.ObjectMeta.Labels == nil {
-		deployment.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	if template.ObjectMeta.Labels == nil {
+		template.ObjectMeta.Labels = map[string]string{}
 	}
-	deployment.Spec.Template.ObjectMeta.Labels["app"] = micro.Name
-	return deployment
+	template.ObjectMeta.Labels["app"] = micro.Name
+	return template
 }
 
 func mergeEnvVars(container *corev1.Container, bindings []api.ServiceBinding) {
@@ -615,7 +615,7 @@ func (r *MicroserviceReconciler) constructDeployment(bindings []api.ServiceBindi
 func setUpAppContainer(container *corev1.Container, micro api.Microservice) {
 	container.Name = "app"
 	container.Image = micro.Spec.Image
-	if len(micro.Spec.Args)>0 {
+	if len(micro.Spec.Args) > 0 {
 		container.Args = micro.Spec.Args
 	}
 	if micro.Spec.Actuators {

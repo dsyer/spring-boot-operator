@@ -45,12 +45,18 @@ spec:
           properties:
             actuators:
               type: boolean
+            args:
+              items:
+                type: string
+              type: array
             bindings:
               items:
                 type: string
               type: array
             image:
               type: string
+            job:
+              type: boolean
             profiles:
               items:
                 type: string

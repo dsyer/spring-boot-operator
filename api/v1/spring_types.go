@@ -24,6 +24,7 @@ import (
 type MicroserviceSpec struct {
 	Image     string                 `json:"image,omitempty"`
 	Args      []string               `json:"args,omitempty"`
+	Job       bool                   `json:"job,omitempty"`
 	Actuators bool                   `json:"actuators,omitempty"`
 	Template  corev1.PodTemplateSpec `json:"template,omitempty"`
 	Bindings  []string               `json:"bindings,omitempty"`

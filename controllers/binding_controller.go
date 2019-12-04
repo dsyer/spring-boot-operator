@@ -17,6 +17,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
@@ -54,8 +55,14 @@ func (r *ServiceBindingReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 	for _, name := range binding.Status.Bound {
 		log.Info("Updating", "micro", name)
 		var micro api.Microservice
+		namespace := req.Namespace
+		if strings.Contains(name, "/") {
+			namespaced := strings.Split(name, "/")
+			name = namespaced[1]
+			namespace = namespaced[0]
+		}
 		if err := r.Get(ctx, types.NamespacedName{
-			Namespace: req.Namespace,
+			Namespace: namespace,
 			Name:      name,
 		}, &micro); err != nil {
 			err = client.IgnoreNotFound(err)

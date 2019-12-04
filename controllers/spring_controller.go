@@ -58,7 +58,7 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	log := r.Log.WithValues("microservice", req.NamespacedName)
 
 	var bindings api.ServiceBindingList
-	if err := r.List(ctx, &bindings, client.InNamespace(req.Namespace)); err != nil {
+	if err := r.List(ctx, &bindings, client.InNamespace(corev1.NamespaceAll)); err != nil {
 		log.Error(err, "Unable to list Bindings")
 		// Not fatal
 	}
@@ -86,26 +86,35 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	var bindingsToApply []api.ServiceBinding
 	if len(micro.Spec.Bindings) > 0 {
-		bindingsToApply = findBindingsToApply(micro, bindings.Items)
 		bindingsMap := map[string]api.ServiceBinding{}
 		for _, binding := range bindings.Items {
-			bindingsMap[binding.Name] = binding
+			bindingsMap[fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)] = binding
+			if binding.Namespace == micro.Namespace {
+				bindingsMap[binding.Name] = binding
+			}
 		}
+		bindingsToApply = findBindingsToApply(micro, bindingsMap)
+		createdNewBindings := false
 		for _, binding := range bindingsToApply {
-			if _, ok := bindingsMap[binding.Name]; !ok {
+			if _, ok := bindingsMap[fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)]; !ok {
 				if err := r.Create(ctx, &binding); err != nil {
 					log.Error(err, "Unable to create ServiceBinding", "binding", binding)
 					// Not fatal
 				} else {
+					createdNewBindings = true
 					log.Info("Created ServiceBinding", "binding", binding)
 				}
 			}
 		}
-		if err := r.List(ctx, &bindings, client.InNamespace(req.Namespace)); err != nil {
-			log.Error(err, "Unable to list Bindings")
-			// Not fatal
+		if createdNewBindings {
+			if err := r.List(ctx, &bindings, client.InNamespace(corev1.NamespaceAll)); err != nil {
+				log.Error(err, "Unable to list Bindings")
+				// Not fatal
+			}
 		}
 	}
+
+	r.copySecretsAndConfigMaps(bindingsToApply, req)
 
 	var service *corev1.Service
 	var deployment *apps.Deployment
@@ -195,6 +204,72 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	return ctrl.Result{}, nil
 }
 
+func (r *MicroserviceReconciler) copySecretsAndConfigMaps(bindings []api.ServiceBinding, req ctrl.Request) error {
+	if len(bindings) == 0 {
+		return nil
+	}
+	ctx := context.Background()
+	log := r.Log.WithValues("microservice", req.NamespacedName)
+	var result error
+	for _, binding := range bindings {
+		if binding.Namespace == req.Namespace {
+			// No need to copy config map in the same namespace
+			continue
+		}
+		for _, volume := range binding.Spec.Template.Spec.Volumes {
+			if volume.ConfigMap != nil {
+				sourceName := volume.ConfigMap.Name
+				var config corev1.ConfigMap
+				if err := r.Get(ctx, client.ObjectKey{
+					Namespace: req.Namespace,
+					Name:      sourceName,
+				}, &config); err != nil {
+					if err := r.Get(ctx, client.ObjectKey{
+						Namespace: binding.Namespace,
+						Name:      sourceName,
+					}, &config); err != nil {
+						log.Info("Unable to obtain source ConfigMap", "namespace", binding.Namespace, "configmap", sourceName)
+						continue
+					}
+					target := config.DeepCopy()
+					target.ResourceVersion = ""
+					target.Annotations["spring.io/servicebinding"] = fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)
+					target.Namespace = req.Namespace
+					if err := r.Create(ctx, target); err != nil {
+						log.Error(err, "Unable to create ConfigMap")
+						result = err
+					}
+				}
+			}
+			if volume.Secret != nil {
+				sourceName := volume.Secret.SecretName
+				var secret corev1.Secret
+				if err := r.Get(ctx, client.ObjectKey{
+					Namespace: req.Namespace,
+					Name:      sourceName,
+				}, &secret); err != nil {
+					if err := r.Get(ctx, client.ObjectKey{
+						Namespace: binding.Namespace,
+						Name:      sourceName,
+					}, &secret); err != nil {
+						log.Info("Unable to obtain source Secret", "namespace", binding.Namespace, "secret", sourceName)
+						continue
+					}
+					target := secret.DeepCopy()
+					target.ResourceVersion = ""
+					target.Annotations["spring.io/servicebinding"] = fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)
+					target.Namespace = req.Namespace
+					if err := r.Create(ctx, target); err != nil {
+						log.Error(err, "Unable to create Secret")
+						result = err
+					}
+				}
+			}
+		}
+	}
+	return result
+}
+
 func (r *MicroserviceReconciler) updateBindings(bindings api.ServiceBindingList, req ctrl.Request) error {
 	if len(bindings.Items) == 0 {
 		return nil
@@ -209,18 +284,23 @@ func (r *MicroserviceReconciler) updateBindings(bindings api.ServiceBindingList,
 	bounds := map[string][]string{}
 	for _, micro := range micros.Items {
 		for _, name := range micro.Spec.Bindings {
-			bounds[name] = append(bounds[name], micro.Name)
+			key := name
+			if !strings.Contains(name, "/") {
+				key = fmt.Sprintf("default/%s", name)
+			}
+			bounds[key] = append(bounds[key], fmt.Sprintf("%s/%s", micro.Namespace, micro.Name))
 		}
 	}
 	var result error
 	names := []string{}
 	for _, binding := range bindings.Items {
-		if bound, ok := bounds[binding.Name]; ok {
+		bindingName := fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)
+		if bound, ok := bounds[bindingName]; ok {
 			binding.Status.Bound = bound
 		} else {
 			binding.Status.Bound = []string{}
 		}
-		names = append(names, binding.Name)
+		names = append(names, bindingName)
 		if err := r.Status().Update(ctx, &binding); err != nil {
 			result = err
 		}
@@ -229,12 +309,8 @@ func (r *MicroserviceReconciler) updateBindings(bindings api.ServiceBindingList,
 	return result
 }
 
-func findBindingsToApply(micro api.Microservice, bindings []api.ServiceBinding) []api.ServiceBinding {
+func findBindingsToApply(micro api.Microservice, bindingsMap map[string]api.ServiceBinding) []api.ServiceBinding {
 	var bindingsToApply = []api.ServiceBinding{}
-	bindingsMap := map[string]api.ServiceBinding{}
-	for _, binding := range bindings {
-		bindingsMap[binding.Name] = binding
-	}
 	for _, name := range micro.Spec.Bindings {
 		if binding, ok := bindingsMap[name]; ok {
 			bindingsToApply = append(bindingsToApply, binding)

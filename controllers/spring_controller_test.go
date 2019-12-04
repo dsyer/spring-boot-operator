@@ -209,7 +209,7 @@ func TestCreateDeploymentBindings(t *testing.T) {
 			Bindings: []string{"mysql", "redis"},
 		},
 	}
-	deployment := createDeployment(findBindingsToApply(micro, []api.ServiceBinding{}), &micro)
+	deployment := createDeployment(findBindingsToApply(micro, map[string]api.ServiceBinding{}), &micro)
 	if len(deployment.Spec.Template.Spec.Volumes) != 5 {
 		t.Errorf("len(container.VolumeMounts) = %d; want 5", len(deployment.Spec.Template.Spec.Volumes))
 		t.FailNow()

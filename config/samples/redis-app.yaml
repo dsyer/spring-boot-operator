@@ -5,4 +5,4 @@ metadata:
 spec:
   image: dsyer/redis-app
   bindings:
-  - redis
+  - services/redis

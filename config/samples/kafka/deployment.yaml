@@ -26,7 +26,7 @@ spec:
             - name: KAFKA_LISTENERS
               value: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
             - name: KAFKA_ADVERTISED_LISTENERS
-              value: INTERNAL://kafka-broker:29092,EXTERNAL://localhost:9092
+              value: INTERNAL://kafka-broker.services.svc.cluster.local:29092,EXTERNAL://localhost:9092
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
               value: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
             - name: KAFKA_INTER_BROKER_LISTENER_NAME

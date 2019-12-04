@@ -1,3 +1,3 @@
-spring.datasource.url=jdbc:mysql://{{.Metadata.Additional.host}}/{{.Secret.database}}
+spring.datasource.url=jdbc:mysql://{{.Metadata.Additional.host}}.services.svc.cluster.local/{{.Secret.database}}
 spring.datasource.username={{.Secret.user}}
 spring.datasource.password={{.Secret.password}}

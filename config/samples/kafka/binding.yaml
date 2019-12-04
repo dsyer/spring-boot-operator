@@ -1,7 +1,7 @@
 apiVersion: spring.io/v1
 kind: ServiceBinding
 metadata:
-  name: mysql
+  name: kafka
 spec:
   env:
   - name: SPRING_CONFIG_LOCATION
@@ -12,6 +12,7 @@ spec:
     value: always
   template:
     spec:
+      imagePullPolicy: Always
       initContainers:
       - name: env
         image: dsyer/spring-boot-bindings
@@ -19,24 +20,24 @@ spec:
         volumeMounts:
         - name: config
           mountPath: /etc/config
-        - name: mysql-metadata
-          mountPath: /config/bindings/mysql/metadata
-        - name: mysql-secret
-          mountPath: /config/bindings/mysql/secret
-        - name: mysql-metadata
-          mountPath: /config/templates/mysql
+        - name: kafka-metadata
+          mountPath: /config/bindings/kafka/metadata
+        - name: kafka-secret
+          mountPath: /config/bindings/kafka/secret
+        - name: kafka-metadata
+          mountPath: /config/templates/kafka
       containers:
       - name: app
         volumeMounts:
         - name: config
           mountPath: /etc/config
       volumes:
-      - name: mysql-metadata
+      - name: kafka-metadata
         configMap:
-          name: mysql-metadata
-      - name: mysql-secret
+          name: kafka-metadata
+      - name: kafka-secret
         secret:
-          secretName: mysql-secret
+          secretName: kafka-secret
       - name: config
         emptyDir: {}
 

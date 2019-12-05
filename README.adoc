@@ -253,7 +253,7 @@ spec:
 
 === CNB Bindings
 
-Services are bound to by name (optionally prefixed with `<namespace>/`). A useful pattern is to implement the CNB Bindings spec, namely that a binding named `<binding>` creates directories in the `Pod` via a `VolumeMount` at `${CNB_BINDINGS_PATH}/<binding>/metadata` and `${CNB_BINDINGS_PATH}/<binding>/secret`. A good way to do that is to create a `ConfigMap` called `<binding>-metadata` and optionally a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries since those are mandatory for CNB Bindings.
+Services are bound to by name (optionally prefixed with `<namespace>/`). A useful pattern is to implement the CNB Bindings spec, namely that a binding named `<binding>` creates directories in the `Pod` via `VolumeMounts` at `${CNB_BINDINGS}/<binding>/metadata` and `${CNB_BINDINGS}/<binding>/secret`. A good way to do that is to create a `ConfigMap` called `<binding>-metadata` and optionally a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries since those are mandatory for CNB Bindings.
 
 There is an https://github.com/dsyer/spring-boot-bindings[init container] that you can use to convert CNB bindings to Spring Boot configuration files. It copies the configuration entries from the binding config maps and secrets into `/etc/config/application.properties`. The `SPRING_CONFIG_LOCATION` can then also be set to pick up this location so your application will see those properties as higher priority than those on the classpath, but still lower than system properties or environment variables.
 
@@ -269,9 +269,9 @@ cnb.secret.other.user=test
 cnb.secret.other.database=test
 ```
 
-The `kind` of the `Binding.Metadata` is also used as a key to locate a transformation rule. The rule is expressed as a set of GO templates that can be rendered from the binding. The templates can be customized by developers (or operators) by including them in the config map (or as a separate config map).
+The `kind` of the `Binding.Metadata` is also used as a key to locate a transformation rule. The rule is expressed as a set of GO templates that can be rendered from the binding. The templates can be customized by developers (or operators) by including them in the config map (or as a separate config map) and mounting them at `${CNB_BINDINGS}/../templates/<binding>`.
 
-There is a sample MySQL service in the project which exposes the right config maps and secrets: look in `config/samples/mysql`. The MySQL example actually generates these properties in addition:
+There is a sample MySQL service in the project which exposes the right config maps and secrets: look in `config/samples/mysql`. The MySQL example generates these properties in addition to the `cnb.*` ones:
 
 ```
 spring.datasource.url=jdbc:mysql://mysql/test

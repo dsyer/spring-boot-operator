@@ -15,6 +15,10 @@ spec:
     description: deployment status
     name: Running
     type: boolean
+  - JSONPath: .status.complete
+    description: completion status
+    name: Complete
+    type: boolean
   group: spring.io
   names:
     kind: Microservice
@@ -4255,6 +4259,8 @@ spec:
         status:
           description: MicroserviceStatus defines the observed state of Microservice
           properties:
+            complete:
+              type: boolean
             label:
               type: string
             running:

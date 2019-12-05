@@ -1,0 +1,11 @@
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: job
+spec:
+  job: true
+  image: busybox
+  args:
+    - /bin/sh
+    - -c
+    - env; find /var/run

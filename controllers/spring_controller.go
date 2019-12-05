@@ -18,10 +18,13 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
+	batch "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,8 +54,8 @@ type MicroserviceReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="batch/v1",resources=jobs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="batch/v1beta1",resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 
 var (
 	ownerKey = ".metadata.controller"
@@ -81,16 +84,6 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	log.Info("Updating", "resource", micro)
 
-	var services corev1.ServiceList
-	var deployments apps.DeploymentList
-	if err := r.List(ctx, &services, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
-		log.Error(err, "Unable to list child Services")
-		return ctrl.Result{}, err
-	}
-	if err := r.List(ctx, &deployments, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
-		log.Error(err, "Unable to list child Deployments")
-		return ctrl.Result{}, err
-	}
 	var bindingsToApply []api.ServiceBinding
 	if len(micro.Spec.Bindings) > 0 {
 		bindingsMap := map[string]api.ServiceBinding{}
@@ -125,78 +118,23 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	r.copySecretsAndConfigMaps(bindingsToApply, req)
 
-	var service *corev1.Service
-	var deployment *apps.Deployment
-
-	if len(deployments.Items) == 0 {
-		var err error
-		deployment, err = r.constructDeployment(bindingsToApply, &micro)
+	if micro.Spec.Job {
+		job, err := r.createAndUpdateJob(req, bindingsToApply, micro)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, deployment); err != nil {
-			log.Error(err, "Unable to create Deployment for micro", "deployment", deployment)
-			r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not create Deployment: %s", err))
-			return ctrl.Result{}, err
-		}
-
-		log.Info("Created Deployments for micro", "deployment", deployment)
-		r.Recorder.Event(&micro, corev1.EventTypeNormal, "DeploymentCreated", "Created Deployment")
+		micro.Status.Running = job.Status.Active > 0
+		micro.Status.Complete = job.Status.Succeeded > 0
 	} else {
-		// update if changed
-		deployment = &deployments.Items[0]
-		deployment.Spec.Template = *updatePodTemplate(&deployment.Spec.Template, bindingsToApply, &micro)
-		if err := r.Update(ctx, deployment); err != nil {
-			if apierrors.IsConflict(err) {
-				log.Info("Unable to update Deployment: reason conflict. Will retry on next event.")
-				err = nil
-			} else {
-				log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
-				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Deployment: %s", err))
-			}
-			return ctrl.Result{}, err
-		}
-
-		log.Info("Updated Deployments for micro", "deployment", deployment)
-		r.Recorder.Event(&micro, corev1.EventTypeNormal, "DeploymentUpdated", "Updated Deployment")
-	}
-
-	log.Info("Found services", "services", len(services.Items))
-	if len(services.Items) == 0 {
-		var err error
-		service, err = r.constructService(&micro)
+		deployment, service, err := r.createAndUpdateDeploymentAndService(req, bindingsToApply, micro)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, service); err != nil {
-			log.Error(err, "Unable to create Service for micro", "service", service)
-			return ctrl.Result{}, err
-		}
-
-		log.Info("Created Service for micro", "service", service)
-		r.Recorder.Event(&micro, corev1.EventTypeNormal, "ServiceCreated", "Created Service")
-	} else {
-		// update if changed
-		service = &services.Items[0]
-		service = updateService(service, &micro)
-		if err := r.Update(ctx, service); err != nil {
-			if apierrors.IsConflict(err) {
-				log.Info("Unable to update Service: reason conflict. Will retry on next event.")
-				err = nil
-			} else {
-				log.Error(err, "Unable to update Service for micro", "service", service)
-				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Service: %s", err))
-			}
-			return ctrl.Result{}, err
-		}
-
-		log.Info("Updated Service for micro", "service", service)
-		r.Recorder.Event(&micro, corev1.EventTypeNormal, "ServiceUpdated", "Updated Service")
+		micro.Status.ServiceName = service.GetName()
+		micro.Status.Running = deployment.Status.AvailableReplicas > 0
 	}
 
-	micro.Status.ServiceName = service.GetName()
 	micro.Status.Label = micro.Name
-	micro.Status.Running = deployment.Status.AvailableReplicas > 0
 
 	if err := r.Status().Update(ctx, &micro); err != nil {
 		if apierrors.IsConflict(err) {
@@ -218,6 +156,150 @@ func (r *MicroserviceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *MicroserviceReconciler) createAndUpdateJob(req ctrl.Request, bindingsToApply []api.ServiceBinding, micro api.Microservice) (batch.Job, error) {
+	ctx := context.Background()
+	log := r.Log.WithValues("microservice", req.NamespacedName)
+
+	var jobs batch.JobList
+	var job *batch.Job
+
+	if err := r.List(ctx, &jobs, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
+		log.Error(err, "Unable to list child Jobs")
+		return batch.Job{}, err
+	}
+
+	if len(jobs.Items) == 0 {
+		var err error
+		job, err = r.constructJob(bindingsToApply, &micro)
+		if err != nil {
+			return batch.Job{}, err
+		}
+		if err := r.Create(ctx, job); err != nil {
+			log.Error(err, "Unable to create Job for micro", "job", job)
+			r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not create Job: %s", err))
+			return *job, err
+		}
+
+		log.Info("Created Jobs for micro", "job", job)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "JobCreated", "Created Job")
+	} else {
+		// update if changed
+		job = jobs.Items[0].DeepCopy()
+		job.Spec.Template = *updatePodTemplate(&job.Spec.Template, bindingsToApply, &micro)
+		if err := r.Update(ctx, job); err != nil {
+			if apierrors.IsInvalid(err) {
+				log.Info("Unable to update Job: reason invalid. Reverting.")
+				var re = regexp.MustCompile(`(^|[^{]*){.*}([^}]*|$)`)
+				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", re.ReplaceAllString(fmt.Sprintf("Job is invalid: %s", err), `$1 {...} $2`))
+				err = nil
+				job = &jobs.Items[0]
+			}
+			if err != nil {
+				if apierrors.IsConflict(err) {
+					log.Info("Unable to update Job: reason conflict. Will retry on next event.")
+					err = nil
+				} else {
+					log.Error(err, "Unable to update Job for micro", "job", job)
+					r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Job: %s", err))
+				}
+			}
+			return *job, err
+		}
+
+		log.Info("Updated Jobs for micro", "job", job)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "JobUpdated", "Updated Job")
+	}
+
+	return *job, nil
+}
+
+func (r *MicroserviceReconciler) createAndUpdateDeploymentAndService(req ctrl.Request, bindingsToApply []api.ServiceBinding, micro api.Microservice) (apps.Deployment, corev1.Service, error) {
+
+	ctx := context.Background()
+	log := r.Log.WithValues("microservice", req.NamespacedName)
+
+	var services corev1.ServiceList
+	var deployments apps.DeploymentList
+	var service *corev1.Service
+	var deployment *apps.Deployment
+
+	if err := r.List(ctx, &services, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
+		log.Error(err, "Unable to list child Services")
+		return *deployment, *service, err
+	}
+	if err := r.List(ctx, &deployments, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
+		log.Error(err, "Unable to list child Deployments")
+		return *deployment, *service, err
+	}
+
+	if len(deployments.Items) == 0 {
+		var err error
+		deployment, err = r.constructDeployment(bindingsToApply, &micro)
+		if err != nil {
+			return *deployment, *service, err
+		}
+		if err := r.Create(ctx, deployment); err != nil {
+			log.Error(err, "Unable to create Deployment for micro", "deployment", deployment)
+			r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not create Deployment: %s", err))
+			return *deployment, *service, err
+		}
+
+		log.Info("Created Deployments for micro", "deployment", deployment)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "DeploymentCreated", "Created Deployment")
+	} else {
+		// update if changed
+		deployment = &deployments.Items[0]
+		deployment.Spec.Template = *updatePodTemplate(&deployment.Spec.Template, bindingsToApply, &micro)
+		if err := r.Update(ctx, deployment); err != nil {
+			if apierrors.IsConflict(err) {
+				log.Info("Unable to update Deployment: reason conflict. Will retry on next event.")
+				err = nil
+			} else {
+				log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
+				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Deployment: %s", err))
+			}
+			return *deployment, *service, err
+		}
+
+		log.Info("Updated Deployments for micro", "deployment", deployment)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "DeploymentUpdated", "Updated Deployment")
+	}
+
+	log.Info("Found services", "services", len(services.Items))
+	if len(services.Items) == 0 {
+		var err error
+		service, err = r.constructService(&micro)
+		if err != nil {
+			return *deployment, *service, err
+		}
+		if err := r.Create(ctx, service); err != nil {
+			log.Error(err, "Unable to create Service for micro", "service", service)
+			return *deployment, *service, err
+		}
+
+		log.Info("Created Service for micro", "service", service)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "ServiceCreated", "Created Service")
+	} else {
+		// update if changed
+		service = &services.Items[0]
+		service = updateService(service, &micro)
+		if err := r.Update(ctx, service); err != nil {
+			if apierrors.IsConflict(err) {
+				log.Info("Unable to update Service: reason conflict. Will retry on next event.")
+				err = nil
+			} else {
+				log.Error(err, "Unable to update Service for micro", "service", service)
+				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Service: %s", err))
+			}
+			return *deployment, *service, err
+		}
+
+		log.Info("Updated Service for micro", "service", service)
+		r.Recorder.Event(&micro, corev1.EventTypeNormal, "ServiceUpdated", "Updated Service")
+	}
+	return *deployment, *service, nil
 }
 
 func (r *MicroserviceReconciler) copySecretsAndConfigMaps(bindings []api.ServiceBinding, req ctrl.Request) error {
@@ -437,6 +519,25 @@ func (r *MicroserviceReconciler) constructService(micro *api.Microservice) (*cor
 	return service, nil
 }
 
+func createJob(bindings []api.ServiceBinding, micro *api.Microservice) *batch.Job {
+	job := &batch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       map[string]string{"app": micro.Name},
+			GenerateName: micro.Name,
+			Namespace:    micro.Namespace,
+		},
+		Spec: batch.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+		},
+	}
+	job.Spec.Template = *updatePodTemplate(&job.Spec.Template, bindings, micro)
+	return job
+}
+
 func createDeployment(bindings []api.ServiceBinding, micro *api.Microservice) *apps.Deployment {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -629,6 +730,16 @@ func createVolumes(binding string, config string) []corev1.Volume {
 	return volumes
 }
 
+// Create a Job for the microservice application
+func (r *MicroserviceReconciler) constructJob(bindings []api.ServiceBinding, micro *api.Microservice) (*batch.Job, error) {
+	job := createJob(bindings, micro)
+	r.Log.Info("Deploying", "job", job)
+	if err := ctrl.SetControllerReference(micro, job, r.Scheme); err != nil {
+		return nil, err
+	}
+	return job, nil
+}
+
 // Create a Deployment for the microservice application
 func (r *MicroserviceReconciler) constructDeployment(bindings []api.ServiceBinding, micro *api.Microservice) (*apps.Deployment, error) {
 	deployment := createDeployment(bindings, micro)
@@ -705,7 +816,7 @@ func setUpInitContainer(container *corev1.Container, binding string) {
 // SetupWithManager Utility method to set up manager
 func (r *MicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(&apps.Deployment{}, ownerKey, func(rawObj runtime.Object) []string {
-		// grab the job object, extract the owner...
+		// grab the deployment object, extract the owner...
 		deployment := rawObj.(*apps.Deployment)
 		owner := metav1.GetControllerOf(deployment)
 		if owner == nil {
@@ -722,7 +833,7 @@ func (r *MicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	if err := mgr.GetFieldIndexer().IndexField(&corev1.Service{}, ownerKey, func(rawObj runtime.Object) []string {
-		// grab the job object, extract the owner...
+		// grab the service object, extract the owner...
 		service := rawObj.(*corev1.Service)
 		owner := metav1.GetControllerOf(service)
 		if owner == nil {
@@ -738,8 +849,44 @@ func (r *MicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}); err != nil {
 		return err
 	}
+	if err := mgr.GetFieldIndexer().IndexField(&batch.Job{}, ownerKey, func(rawObj runtime.Object) []string {
+		// grab the job object, extract the owner...
+		job := rawObj.(*batch.Job)
+		owner := metav1.GetControllerOf(job)
+		if owner == nil {
+			return nil
+		}
+		// ...make sure it's ours...
+		if owner.APIVersion != apiGVStr || owner.Kind != "Microservice" {
+			return nil
+		}
+
+		// ...and if so, return it
+		return []string{owner.Name}
+	}); err != nil {
+		return err
+	}
+	if err := mgr.GetFieldIndexer().IndexField(&batchv1beta1.CronJob{}, ownerKey, func(rawObj runtime.Object) []string {
+		// grab the job object, extract the owner...
+		job := rawObj.(*batchv1beta1.CronJob)
+		owner := metav1.GetControllerOf(job)
+		if owner == nil {
+			return nil
+		}
+		// ...make sure it's ours...
+		if owner.APIVersion != apiGVStr || owner.Kind != "Microservice" {
+			return nil
+		}
+
+		// ...and if so, return it
+		return []string{owner.Name}
+	}); err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Microservice{}).
+		Owns(&batch.Job{}).
+		Owns(&batchv1beta1.CronJob{}).
 		Owns(&corev1.Service{}).
 		Owns(&apps.Deployment{}).
 		Complete(r)

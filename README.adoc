@@ -149,21 +149,6 @@ $ curl localhost:8080/actuator | jq .
 
 There are more features, expressing opinions about how pods should be defined when Spring Boot applications are being deployed.
 
-
-== Actuators
-
-If your application container has Spring Boot Actuators then it probably makes sense to use them as Kubernetes probes. You can do that in one line (accepting the default configuration of liveness and readiness probes):
-
-```
-apiVersion: spring.io/v1
-kind: Microservice
-metadata:
-  name: actr
-spec:
-  image: springguides/demo
-  actuators: true
-```
-
 == Spring Profiles
 
 Spring Profiles can be activated by putting `profiles` in the `Microservice` spec (as an array). Example:
@@ -199,6 +184,22 @@ spec:
 ```
 
 Each binding is used to search for a `ServiceBinding` of the same name, in the same namespace. If no matching `ServiceBinding` is defined, then a default is provided based on a naming convention.
+
+=== Actuators
+
+If your application container has Spring Boot Actuators then it probably makes sense to use them as Kubernetes probes. You can do that in one line (accepting the default configuration of liveness and readiness probes):
+
+```
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: actr
+spec:
+  image: springguides/demo
+  bindings: actuators
+```
+
+The default binding for "actuators" is a liveness probe on `/actuator/info` and a readiness probe on `/actuator/health`. You can change the probe configurations if you need to using a custom binding.
 
 === Custom Bindings
 
@@ -250,11 +251,13 @@ spec:
 
 `EnvVar` entries in a `ServiceBinding` can have a single `value` or multiple `values`. In the case of a single `value` the last one to bind wins. With multiple `values` they are merged and written into the app container as a comma-separated list.
 
-=== Default Bindings
+=== CNB Bindings
 
-Services are bound to by name, and by making an assumption about the way they expose their CNB Bindings, namely that a binding named `<binding>` creates a `ConfigMap` called `<binding>-metadata` and a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries since those are mandatory for CNB Bindings.
+Services are bound to by name (optionally prefixed with `<namespace>/`). A useful pattern is to implement the CNB Bindings spec, namely that a binding named `<binding>` creates directories in the `Pod` via a `VolumeMount` at `${CNB_BINDINGS_PATH}/<binding>/metadata` and `${CNB_BINDINGS_PATH}/<binding>/secret`. A good way to do that is to create a `ConfigMap` called `<binding>-metadata` and optionally a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries since those are mandatory for CNB Bindings.
 
-An https://github.com/dsyer/spring-boot-bindings[init container] named "env" is added to the application pod. It copies the configuration entries from the binding config maps and secrets into `/etc/config/application.properties`. The `SPRING_CONFIG_LOCATION` is also set to pick up this location so your application will see those properties as higher priority than those on the classpath, but still lower than system properties or environment variables. The entries for the MySQL example look like this:
+There is an https://github.com/dsyer/spring-boot-bindings[init container] that you can use to convert CNB bindings to Spring Boot configuration files. It copies the configuration entries from the binding config maps and secrets into `/etc/config/application.properties`. The `SPRING_CONFIG_LOCATION` can then also be set to pick up this location so your application will see those properties as higher priority than those on the classpath, but still lower than system properties or environment variables.
+
+For example if there is a `ConfigMap` and a `Secret`, the `application.properties` entries for the MySQL example might come out like this:
 
 ```
 cnb.metadata.other.host=mysql
@@ -266,7 +269,7 @@ cnb.secret.other.user=test
 cnb.secret.other.database=test
 ```
 
-The `kind` of the `Binding.Metadata` is also used as a key to locate a transformation rule. The rule is expressed as a set of GO templates that can be rendered from the binding. The templates are currently stored in the init container image, but could be generalized into something that could be customized by developers (or operators).
+The `kind` of the `Binding.Metadata` is also used as a key to locate a transformation rule. The rule is expressed as a set of GO templates that can be rendered from the binding. The templates can be customized by developers (or operators) by including them in the config map (or as a separate config map).
 
 There is a sample MySQL service in the project which exposes the right config maps and secrets: look in `config/samples/mysql`. The MySQL example actually generates these properties in addition:
 
@@ -276,7 +279,11 @@ spring.datasource.username=test
 spring.datasource.password=test
 ```
 
-so a Spring Boot application with `mysql-connector` will automatically connect because it matches the default naming conventions in `spring-boot-autoconfigure`.
+A Spring Boot application with `mysql-connector` will automatically connect because it matches the default naming conventions in `spring-boot-autoconfigure`.
+
+=== Default (Non-Actuators) Bindings
+
+Services are bound to by name (optionally prefixed with `<namespace>/`). If there is no binding at the namespaced location specified, then a default one is created. Any other binding than "actuators" generates a CNB style `ServiceBinding`, namely it assumes the existence of a `ConfigMap` called `<binding>-metadata` and a `Secret` called `<binding>-secret`. The `ConfigMap` should have at least the `kind`, `provider` and `tags` entries since those are mandatory for CNB Bindings.
 
 == Pod Specs
 
@@ -300,3 +307,23 @@ spec:
 ```
 
 You could add your own probes here, volume mounts, whatever you need to customize the application container. The image is always set to the one in the top of the `MicroService` spec.
+
+== Jobs
+
+Instead of a `Deployment` and a `Service`, a `MicroService` can be a short-lived process, implemented as a `Job` in Kubernetes. Just make sure the `app` container is short-lived, and set the `job` flag in the `MicroService`. Example:
+
+```
+apiVersion: spring.io/v1
+kind: Microservice
+metadata:
+  name: job
+spec:
+  job: true
+  image: busybox
+  args:
+    - /bin/sh
+    - -c
+    - env; find /var/run
+```
+
+Because of the way Kubernetes works, you cannot mutate a `Job` (e.g. change its `Pod` spec) once it has started. You need a different name, or to delete the old `MicroService`, or the old `Job` instance, in order to run another one.

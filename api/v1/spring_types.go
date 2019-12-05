@@ -35,6 +35,7 @@ type MicroserviceStatus struct {
 	ServiceName string `json:"serviceName,omitempty"`
 	Label       string `json:"label,omitempty"`
 	Running     bool   `json:"running,omitempty"`
+	Complete    bool   `json:"complete,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -43,6 +44,7 @@ type MicroserviceStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image",description="image label"
 // +kubebuilder:printcolumn:name="Running",type="boolean",JSONPath=".status.running",description="deployment status"
+// +kubebuilder:printcolumn:name="Complete",type="boolean",JSONPath=".status.complete",description="completion status"
 type Microservice struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

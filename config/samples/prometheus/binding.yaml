@@ -3,6 +3,13 @@ kind: ServiceBinding
 metadata:
   name: prometheus
 spec:
+  env:
+  - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+    values:
+    - info
+    - health
+    - prometheus
+    - metrics
   template:
     metadata:
       annotations:

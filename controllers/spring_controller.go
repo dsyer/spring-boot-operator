@@ -215,7 +215,7 @@ func (r *MicroserviceReconciler) createAndUpdateJob(req ctrl.Request, bindingsTo
 	return *job, nil
 }
 
-func (r *MicroserviceReconciler) createAndUpdateDeploymentAndService(req ctrl.Request, bindingsToApply []api.ServiceBinding, micro api.Microservice) (apps.Deployment, corev1.Service, error) {
+func (r *MicroserviceReconciler) createAndUpdateDeploymentAndService(req ctrl.Request, bindingsToApply []api.ServiceBinding, micro api.Microservice) (*apps.Deployment, *corev1.Service, error) {
 
 	ctx := context.Background()
 	log := r.Log.WithValues("microservice", req.NamespacedName)
@@ -227,23 +227,23 @@ func (r *MicroserviceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 
 	if err := r.List(ctx, &services, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
 		log.Error(err, "Unable to list child Services")
-		return *deployment, *service, err
+		return deployment, service, err
 	}
 	if err := r.List(ctx, &deployments, client.InNamespace(req.Namespace), client.MatchingFields{ownerKey: req.Name}); err != nil {
 		log.Error(err, "Unable to list child Deployments")
-		return *deployment, *service, err
+		return deployment, service, err
 	}
 
 	if len(deployments.Items) == 0 {
 		var err error
 		deployment, err = r.constructDeployment(bindingsToApply, &micro)
 		if err != nil {
-			return *deployment, *service, err
+			return deployment, service, err
 		}
 		if err := r.Create(ctx, deployment); err != nil {
 			log.Error(err, "Unable to create Deployment for micro", "deployment", deployment)
 			r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not create Deployment: %s", err))
-			return *deployment, *service, err
+			return deployment, service, err
 		}
 
 		log.Info("Created Deployments for micro", "deployment", deployment)
@@ -260,7 +260,7 @@ func (r *MicroserviceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 				log.Error(err, "Unable to update Deployment for micro", "deployment", deployment)
 				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Deployment: %s", err))
 			}
-			return *deployment, *service, err
+			return deployment, service, err
 		}
 
 		log.Info("Updated Deployments for micro", "deployment", deployment)
@@ -272,11 +272,11 @@ func (r *MicroserviceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 		var err error
 		service, err = r.constructService(&micro)
 		if err != nil {
-			return *deployment, *service, err
+			return deployment, service, err
 		}
 		if err := r.Create(ctx, service); err != nil {
 			log.Error(err, "Unable to create Service for micro", "service", service)
-			return *deployment, *service, err
+			return deployment, service, err
 		}
 
 		log.Info("Created Service for micro", "service", service)
@@ -293,13 +293,13 @@ func (r *MicroserviceReconciler) createAndUpdateDeploymentAndService(req ctrl.Re
 				log.Error(err, "Unable to update Service for micro", "service", service)
 				r.Recorder.Event(&micro, corev1.EventTypeWarning, "ErrInvalidResource", fmt.Sprintf("Could not update Service: %s", err))
 			}
-			return *deployment, *service, err
+			return deployment, service, err
 		}
 
 		log.Info("Updated Service for micro", "service", service)
 		r.Recorder.Event(&micro, corev1.EventTypeNormal, "ServiceUpdated", "Updated Service")
 	}
-	return *deployment, *service, nil
+	return deployment, service, nil
 }
 
 func (r *MicroserviceReconciler) copySecretsAndConfigMaps(bindings []api.ServiceBinding, req ctrl.Request) error {
@@ -564,9 +564,9 @@ func updatePodTemplate(template *corev1.PodTemplateSpec, bindings []api.ServiceB
 		defaults.Name = "app"
 	}
 	for _, binding := range bindings {
-		mergePodTemplates(binding.Spec.Template, template)
+		Merge(binding.Spec.Template, template)
 	}
-	mergePodTemplates(micro.Spec.Template, template)
+	Merge(micro.Spec.Template, template)
 	container := findAppContainer(&template.Spec)
 	setUpAppContainer(container, *micro)
 	// Reset all env vars so any deletions get picked up in the merge

@@ -24,30 +24,30 @@ import (
 
 func TestMergePod(t *testing.T) {
 	target := corev1.PodTemplateSpec{
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					corev1.Container{
-						Name: "foo",
-						Env: []corev1.EnvVar{
-							corev1.EnvVar{
-								Name:  "BAR",
-								Value: "foo",
-							},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				corev1.Container{
+					Name: "foo",
+					Env: []corev1.EnvVar{
+						corev1.EnvVar{
+							Name:  "BAR",
+							Value: "foo",
 						},
 					},
 				},
 			},
-		}
+		},
+	}
 	source := corev1.PodTemplateSpec{
-			ObjectMeta: v1.ObjectMeta{
-				Annotations: map[string]string{
-					"foo": "bar",
-				},
+		ObjectMeta: v1.ObjectMeta{
+			Annotations: map[string]string{
+				"foo": "bar",
 			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{},
-			},
-		}
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{},
+		},
+	}
 	err := Merge(source, &target)
 	if err != nil {
 		t.Errorf("Failed to make resource map: %s", err)

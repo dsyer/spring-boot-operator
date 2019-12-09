@@ -270,7 +270,7 @@ func TestCreateDeploymentBindings(t *testing.T) {
 }
 
 func findVolume(volumes []corev1.Volume, name string) corev1.Volume {
-	for _,volume := range volumes {
+	for _, volume := range volumes {
 		if volume.Name == name {
 			return volume
 		}

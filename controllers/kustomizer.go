@@ -20,20 +20,17 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/kustomize/api/types"
 )
 
-// TypedObject Needs a comment
-type TypedObject struct {
+type typedObject struct {
 	types.TypeMeta `json:",inline"`
 	ObjectMeta     v1.ObjectMeta `json:"metadata,omitempty"`
 	Data           interface{}   `json:"data,omitempty"`
 }
 
-// Merge Merges two objects of the same type
-func Merge(source interface{}, target interface{}) error {
+func mergeResources(source interface{}, target interface{}) error {
 	resource, err := json.Marshal(target)
 	if err != nil {
 		return err
@@ -42,7 +39,7 @@ func Merge(source interface{}, target interface{}) error {
 	if err != nil {
 		return err
 	}
-	result, err := strategicMergePatch(resource, patch, target)
+	result, err := strategicpatch.StrategicMergePatch(resource, patch, target)
 	if err != nil {
 		return err
 	}
@@ -52,44 +49,4 @@ func Merge(source interface{}, target interface{}) error {
 		return err
 	}
 	return nil
-}
-
-func strategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte, error) {
-	schema, err := strategicpatch.NewPatchMetaFromStruct(dataStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return strategicMergePatchUsingLookupPatchMeta(original, patch, schema)
-}
-
-func strategicMergePatchUsingLookupPatchMeta(original, patch []byte, schema strategicpatch.LookupPatchMeta) ([]byte, error) {
-	originalMap, err := handleUnmarshal(original)
-	if err != nil {
-		return nil, err
-	}
-	patchMap, err := handleUnmarshal(patch)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := strategicpatch.MergeStrategicMergeMapPatchUsingLookupPatchMeta(schema, originalMap, patchMap)
-	if err != nil {
-		return nil, err
-	}
-
-	return json.Marshal(result)
-}
-
-func handleUnmarshal(j []byte) (map[string]interface{}, error) {
-	if j == nil {
-		j = []byte("{}")
-	}
-
-	m := map[string]interface{}{}
-	err := json.Unmarshal(j, &m)
-	if err != nil {
-		return nil, mergepatch.ErrBadJSONDoc
-	}
-	return m, nil
 }

@@ -564,9 +564,9 @@ func updatePodTemplate(template *corev1.PodTemplateSpec, bindings []api.ServiceB
 		defaults.Name = "app"
 	}
 	for _, binding := range bindings {
-		Merge(binding.Spec.Template, template)
+		mergeResources(binding.Spec.Template, template)
 	}
-	Merge(micro.Spec.Template, template)
+	mergeResources(micro.Spec.Template, template)
 	container := findAppContainer(&template.Spec)
 	setUpAppContainer(container, *micro)
 	// Reset all env vars so any deletions get picked up in the merge

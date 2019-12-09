@@ -27,44 +27,7 @@ var (
 )
 
 func mergePodTemplates(source corev1.PodTemplateSpec, target *corev1.PodTemplateSpec) error {
-	for k, v := range source.Annotations {
-		if target.Annotations[k] == "" {
-			if target.Annotations == nil {
-				target.Annotations = map[string]string{}
-			}
-			// Only set if not already specified
-			target.Annotations[k] = v
-		}
-	}
-	// TODO: Copy more properties. DeepCopy is too blunt.
-	if source.Spec.RestartPolicy != "" {
-		target.Spec.RestartPolicy = source.Spec.RestartPolicy
-	}
-	for _, s := range source.Spec.Containers {
-		t := findContainerByName(target.Spec.Containers, s.Name)
-		if t.Name != emptyContainer.Name {
-			mergeContainers(s, t)
-		} else {
-			target.Spec.Containers = append(target.Spec.Containers, s)
-		}
-	}
-	for _, s := range source.Spec.InitContainers {
-		t := findContainerByName(target.Spec.InitContainers, s.Name)
-		if t.Name != emptyContainer.Name {
-			mergeContainers(s, t)
-		} else {
-			target.Spec.InitContainers = append(target.Spec.InitContainers, s)
-		}
-	}
-	for _, s := range source.Spec.Volumes {
-		t := findVolumeByName(target.Spec.Volumes, s.Name)
-		if t.Name != emptyVolume.Name {
-			mergeVolumes(s, t)
-		} else {
-			target.Spec.Volumes = append(target.Spec.Volumes, s)
-		}
-	}
-	return nil
+	return Merge(source, target)
 }
 
 func findContainerByName(containers []corev1.Container, name string) *corev1.Container {
@@ -104,71 +67,17 @@ func findEnvByName(env []corev1.EnvVar, name string) *corev1.EnvVar {
 }
 
 func mergeVolumes(source corev1.Volume, target *corev1.Volume) {
-	if source.ConfigMap != emptyVolume.ConfigMap {
-		target.ConfigMap = source.ConfigMap
-	}
-	if source.Secret != emptyVolume.Secret {
-		target.Secret = source.Secret
-	}
-	if source.HostPath != emptyVolume.HostPath {
-		target.HostPath = source.HostPath
-	}
+	Merge(source, target)
 }
 
 func mergeContainers(source corev1.Container, target *corev1.Container) {
-	if source.Image != emptyContainer.Image {
-		target.Image = source.Image
-	}
-	if source.ImagePullPolicy != emptyContainer.ImagePullPolicy {
-		target.ImagePullPolicy = source.ImagePullPolicy
-	}
-	if len(source.Command) > 0 {
-		target.Command = source.Command
-	}
-	if len(source.Args) > 0 {
-		target.Args = source.Args
-	}
-	if source.WorkingDir != emptyContainer.WorkingDir {
-		target.WorkingDir = source.WorkingDir
-	}
-	for _, s := range source.VolumeMounts {
-		t := findVolumeMountByName(target.VolumeMounts, s.Name)
-		if t.Name != emptyVolumeMount.Name {
-			mergeVolumeMounts(s, t)
-		} else {
-			target.VolumeMounts = append(target.VolumeMounts, s)
-		}
-
-	}
-	for _, s := range source.Env {
-		t := findEnvByName(target.Env, s.Name)
-		if t.Name != emptyEnvVar.Name {
-			t.Value = s.Value
-		} else {
-			target.Env = append(target.Env, s)
-		}
-
-	}
-	if source.LivenessProbe != nil {
-		if target.LivenessProbe == nil {
-			target.LivenessProbe = source.LivenessProbe
-		} else {
-			mergeProbes(*source.LivenessProbe, target.LivenessProbe)
-		}
-	}
-	if source.ReadinessProbe != nil {
-		if target.ReadinessProbe == nil {
-			target.ReadinessProbe = source.ReadinessProbe
-		} else {
-			mergeProbes(*source.ReadinessProbe, target.ReadinessProbe)
-		}
-	}
+	Merge(source, target)
 }
 
 func mergeProbes(source corev1.Probe, target *corev1.Probe) {
-	source.DeepCopyInto(target)
+	Merge(source, target)
 }
 
 func mergeVolumeMounts(source corev1.VolumeMount, target *corev1.VolumeMount) {
-	// TODO: something
+	Merge(source, target)
 }

@@ -48,7 +48,7 @@ func TestMergePod(t *testing.T) {
 				Containers: []corev1.Container{},
 			},
 		}
-	err := Merge(&target, source)
+	err := Merge(source, &target)
 	if err != nil {
 		t.Errorf("Failed to make resource map: %s", err)
 		t.FailNow()

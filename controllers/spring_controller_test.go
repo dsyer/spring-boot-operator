@@ -214,14 +214,14 @@ func TestCreateDeploymentBindings(t *testing.T) {
 		t.Errorf("len(container.VolumeMounts) = %d; want 5", len(deployment.Spec.Template.Spec.Volumes))
 		t.FailNow()
 	}
-	volume := deployment.Spec.Template.Spec.Volumes[1]
+	volume := findVolumeByName(deployment.Spec.Template.Spec.Volumes, "mysql-secret")
 	if volume.Name != "mysql-secret" {
 		t.Errorf("Volumes[1].Name = %s; want 'mysql-secret'", volume.Name)
 	}
 	if volume.VolumeSource.Secret.SecretName != "mysql-secret" {
 		t.Errorf("Volumes[1].Name = %s; want 'mysql-secret'", volume.VolumeSource.Secret.SecretName)
 	}
-	volume = deployment.Spec.Template.Spec.Volumes[0]
+	volume = findVolumeByName(deployment.Spec.Template.Spec.Volumes, "mysql-metadata")
 	if volume.Name != "mysql-metadata" {
 		t.Errorf("Volumes[0].Name = %s; want 'mysql-metadata'", volume.Name)
 	}
@@ -254,19 +254,28 @@ func TestCreateDeploymentBindings(t *testing.T) {
 		t.Errorf("len(container.VolumeMounts) = %d; want 5", len(container.VolumeMounts))
 		t.FailNow()
 	}
-	mount := container.VolumeMounts[1]
+	mount := findVolumeMountByName(container.VolumeMounts, "mysql-metadata")
 	if mount.Name != "mysql-metadata" {
 		t.Errorf("container.VolumeMounts[0].Name = %s; want 'mysql-metadata'", container.VolumeMounts[0].Name)
 	}
-	mount = container.VolumeMounts[3]
+	mount = findVolumeMountByName(container.VolumeMounts, "redis-metadata")
 	if mount.Name != "redis-metadata" {
 		t.Errorf("container.VolumeMounts[1].Name = %s; want 'redis-metadata'", container.VolumeMounts[1].Name)
 	}
-	mount = container.VolumeMounts[0]
+	mount = findVolumeMountByName(container.VolumeMounts, "config")
 	if mount.Name != "config" {
 		t.Errorf("container.VolumeMounts[1].Name = %s; want 'config'", container.VolumeMounts[1].Name)
 	}
 
+}
+
+func findVolume(volumes []corev1.Volume, name string) corev1.Volume {
+	for _,volume := range volumes {
+		if volume.Name == name {
+			return volume
+		}
+	}
+	return emptyVolume
 }
 
 func TestCreateDeploymentProfiles(t *testing.T) {

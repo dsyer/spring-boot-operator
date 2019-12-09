@@ -33,21 +33,21 @@ type TypedObject struct {
 }
 
 // Merge Merges two objects of the same type
-func Merge(resource interface{}, patch interface{}) error {
-	target, err := json.Marshal(resource)
+func Merge(source interface{}, target interface{}) error {
+	resource, err := json.Marshal(target)
 	if err != nil {
 		return err
 	}
-	source, err := json.Marshal(patch)
+	patch, err := json.Marshal(source)
 	if err != nil {
 		return err
 	}
-	result, err := strategicMergePatch(target, source, resource)
+	result, err := strategicMergePatch(resource, patch, target)
 	if err != nil {
 		return err
 	}
 	fmt.Println(string(result))
-	err = json.Unmarshal(result, resource)
+	err = json.Unmarshal(result, target)
 	if err != nil {
 		return err
 	}

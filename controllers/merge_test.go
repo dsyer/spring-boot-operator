@@ -17,6 +17,7 @@ package controllers
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 )
 
@@ -52,6 +53,69 @@ func findEnvByName(env []corev1.EnvVar, name string) *corev1.EnvVar {
 		}
 	}
 	return &emptyEnvVar
+}
+
+func TestMergePod(t *testing.T) {
+	target := corev1.PodTemplateSpec{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				corev1.Container{
+					Name: "foo",
+					Env: []corev1.EnvVar{
+						corev1.EnvVar{
+							Name:  "BAR",
+							Value: "foo",
+						},
+					},
+				},
+			},
+		},
+	}
+	source := corev1.PodTemplateSpec{
+		ObjectMeta: v1.ObjectMeta{
+			Annotations: map[string]string{
+				"foo": "bar",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{},
+		},
+	}
+	err := mergeResources(source, &target)
+	if err != nil {
+		t.Errorf("Failed to make resource map: %s", err)
+		t.FailNow()
+	}
+	if target.ObjectMeta.Annotations["foo"] != "bar" {
+		t.Errorf("Failed to merge annotations: %s", target.ObjectMeta.Annotations)
+	}
+	if len(target.Spec.Containers) != 1 {
+		t.Errorf("Failed to merge containers expected 1 container found: %d", len(target.Spec.Containers))
+	}
+}
+
+type testStruct struct {
+	Name string `json:"name,omitempty"`
+	// Container.Args is not defined with this patchStrategy
+	Args []string `json:"args,omitempty" patchStrategy:"merge"`
+}
+
+func TestMergeArgs(t *testing.T) {
+	target := testStruct{
+		Name: "foo",
+		Args: []string{"one", "two"},
+	}
+	source := map[string]interface{}{
+		"args": []string{"three", "four"},
+	}
+	err := mergeResources(source, &target)
+	if err != nil {
+		t.Errorf("Failed to make resource map: %s", err)
+		t.FailNow()
+	}
+	if len(target.Args) != 4 {
+		t.Errorf("Failed to merge containers expected 4 container found: %d", len(target.Args))
+	}
 }
 
 func TestMergeContainersWithEnv(t *testing.T) {

@@ -16,19 +16,9 @@ limitations under the License.
 package controllers
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"sigs.k8s.io/kustomize/api/types"
 )
-
-type typedObject struct {
-	types.TypeMeta `json:",inline"`
-	ObjectMeta     v1.ObjectMeta `json:"metadata,omitempty"`
-	Data           interface{}   `json:"data,omitempty"`
-}
 
 func mergeResources(source interface{}, target interface{}) error {
 	resource, err := json.Marshal(target)
@@ -43,7 +33,6 @@ func mergeResources(source interface{}, target interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(result))
 	err = json.Unmarshal(result, target)
 	if err != nil {
 		return err

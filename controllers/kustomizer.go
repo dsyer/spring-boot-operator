@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	fs "sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/types"
 )
 
@@ -31,16 +30,6 @@ type TypedObject struct {
 	types.TypeMeta `json:",inline"`
 	ObjectMeta     v1.ObjectMeta `json:"metadata,omitempty"`
 	Data           interface{}   `json:"data,omitempty"`
-}
-
-// Write Writes the object to a config path in the file system
-func Write(files fs.FileSystem, path string, object interface{}) error {
-	bytes, err := json.Marshal(object)
-	if err != nil {
-		return err
-	}
-	files.WriteFile(fmt.Sprintf("/config/%s", path), []byte(bytes))
-	return nil
 }
 
 // Merge Merges two objects of the same type

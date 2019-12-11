@@ -26,7 +26,7 @@ The same manifest is available under `samples/mysql/binding.yaml`{{open}} if you
 kubectl get deployment petclinic -o yaml
 ```{{execute}}
 
-Most of the `mysql` binding is taken up with an init container (which runs before the main application) and the configuration it needs to set up an `application.properties` file in a form that Spring Boot will recognise.
+Most of the `samples/mysql/binding.yaml`{{open}} is taken up with an init container (which runs before the main application) and the configuration it needs to set up an `application.properties` file in a form that Spring Boot will recognise.
 
 You can apply multiple bindings to a single `Microservice` and each of them is merged using the Kubernetes standard JSON merge semantics. The way that various fields behave when patched can be read in the Go docs, e.g. for [`PodSpec`](https://godoc.org/k8s.io/api/core/v1#PodSpec) you will see
 
@@ -40,7 +40,7 @@ type PodSpec struct {
 
 Note that the `patchStrategy` for `Containers` is "merge", with a `patchMergeKey` of "name". That means that additional containers can be added cleanly as long as they have unique names. We would have to look at the definition of the `Container` resource to see what happens to a container that is merged with itself (one with the same name). Some properties have an explicit `patchStrategy` and some do not. The default is to overwrite.
 
-The `ServiceBinding` resource has a special feature influenced by the way Spring Boot has configuration properties that are arrays, expressed as a comma-separated value generally. An example would be `SPRING_CONFIG_LOCATION` which is the search path for `application.properties`. The `mysql` binding specifies this as an actual array in YAML:
+The `ServiceBinding` resource has a special feature influenced by the way Spring Boot has configuration properties that are arrays, expressed as a comma-separated value generally. An example would be `SPRING_CONFIG_LOCATION` which is the search path for `application.properties`. The `samples/mysql/binding.yaml`{{open}} specifies this as an actual array in YAML:
 
 ```
 apiVersion: spring.io/v1
@@ -58,7 +58,7 @@ spec:
 
 The `env` entries at the top of the `spec` are special: they allow multiple values to be accumulated over multiple bindings, all of which are joined together using a comma in the final generated `Deployment`. If you look in the `petclinic` deployment you will see that `SPRING_CONFIG_LOCATION` is a comma-separated value.
 
-The rest of the `Microservice` spec for the Petclinic concerns environment variables that adapt the vanilla Petclinic to the Kubernetes cluster. For example:
+The rest of the `samples/petclinic.yaml`{{open}} spec concerns environment variables that adapt the vanilla Petclinic to the Kubernetes cluster. For example:
 
 ```
 kind: Microservice

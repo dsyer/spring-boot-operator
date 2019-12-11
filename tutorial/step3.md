@@ -13,7 +13,7 @@ Then we need to create a `PersistentVolume`:
 sudo mkdir /mnt/data && kubectl apply -f samples/mysql/pv.yaml -n services
 ```{{execute}}
 
-AT this point we can install the database service into the new namespace:
+At this point we can install the database service into the new namespace:
 
 ```
 kubectl apply -f <(kustomize build samples/mysql)
@@ -45,9 +45,30 @@ Finally deploy the Petclinic:
 kubectl apply -f samples/petclinic.yaml
 ```{{execute}}
 
+Wait for the application to start:
+
+```
+kubectl get all
+```{{execute}}
+
+```
+NAME                             READY   STATUS    RESTARTS   AGE
+pod/petclinic-6997fcbb87-747fr   1/1     Running   0          45s
+
+NAME                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP   3m20s
+service/petclinic    ClusterIP   10.102.255.123   <none>        80/TCP    45s
+
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/petclinic   1/1     1            1           45s
+
+NAME                                   DESIRED   CURRENT   READY   AGE
+replicaset.apps/petclinic-6997fcbb87   1         1         1       45s
+```
+
 Now we can connect to the application. First create an SSH tunnel:
 
-`kubectl port-forward svc/demo 8080:80 --address=0.0.0.0`{{execute T1}}
+`kubectl port-forward svc/petclinic 8080:80 --address=0.0.0.0`{{execute T1}}
 
 and then you can verify that the app is running:
 

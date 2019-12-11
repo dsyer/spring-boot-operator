@@ -25,7 +25,7 @@
     }
   },
   "environment": {
-    "uilayout": "editor-terminal",
+    "uilayout": "terminal",
     "showdashboard": true,
     "dashboards": [{ "name": "App", "port": 8080 }]
   },

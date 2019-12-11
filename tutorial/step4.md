@@ -17,14 +17,17 @@ spec:
 The binding is a namespaced reference to another CRD, the `ServiceBinding`. We can inspect the `ServiceBinding`:
 
 ```
-kubectl get servicebinding mysql -n services -o yaml
+kubectl get servicebinding mysql -n services
 ```{{execute}}
-
-The same manifest is available under `samples/mysql/binding.yaml`{{open}} if you want to open it up and see precisely what was deployed. It has the form of a `PodTemplateSpec`, which is merged with the application's own `PodTemplateSpec` when the `Deployment` is generated. If you look at the YAML for the active `Deployment` you will see the same stuff in the `Pod` spec:
 
 ```
-kubectl get deployment petclinic -o yaml
-```{{execute}}
+NAME    BOUND
+mysql   [default/petclinic]
+```
+
+We can tell from this summary that there is one `ServiceBinding` and it is currently bound to one `Microservice` (in the "default" namespace). If you want all the details of the manifest youc can look at the YAML `kubectl get servicebinding mysql -n services -o yaml`{{execute}}.
+
+The same YAML manifest is available under `samples/mysql/binding.yaml`{{open}} if you want to open it up and see precisely what was deployed. It has the form of a `PodTemplateSpec`, which is merged with the application's own `PodTemplateSpec` when the `Deployment` is generated. If you look at the YAML for the active `Deployment` you will see the same stuff in the `Pod` spec `kubectl get deployment petclinic -o yaml`{{execute}}.
 
 Most of the `samples/mysql/binding.yaml`{{open}} is taken up with an init container (which runs before the main application) and the configuration it needs to set up an `application.properties` file in a form that Spring Boot will recognise.
 

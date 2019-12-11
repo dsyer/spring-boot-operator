@@ -4,7 +4,6 @@ metadata:
   name: petclinic
 spec:
   image: dsyer/petclinic
-  actuators: true
   bindings:
   - services/mysql
   template:

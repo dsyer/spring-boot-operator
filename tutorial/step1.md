@@ -5,6 +5,8 @@ The controller is in Dockerhub and the CRDs are defined in Github, so you should
 kubectl apply -f <(kustomize build github.com/dsyer/spring-boot-operator/config/default)
 ```{{execute}}
 
+> TIP: If the command above fails, keep trying: the network environment takes a minute to stabilize sometimes.
+
 One `Service` for the controller is installed into the `spring-system` namespace:
 
 ```
@@ -24,3 +26,5 @@ deployment.apps/spring-controller-manager   1/1     1            1           3m1
 NAME                                                   DESIRED   CURRENT   READY   AGE
 replicaset.apps/spring-controller-manager-79c6c95677   1         1         1       3m17s
 ```
+
+Keep looking at the `spring-system` namespace until the controller `Pod` is `Running`. It might take a minute to download the container.

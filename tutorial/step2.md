@@ -1,5 +1,7 @@
 
-Quickly inspect the deployment manifest at `samples/demo.yaml`{{open}} for a simple application on Kubernetes. It's only a few lines because with a few opinions baked in, it only really needs to know the image location:
+> TIP: Wait for the `samples` directory to download in the editor pane.
+
+You can then quickly inspect the deployment manifest at `samples/demo.yaml`{{open}} for a simple application on Kubernetes. It's only a few lines because with a few opinions baked in, it only really needs to know the image location:
 
 ```
 apiVersion: spring.io/v1
@@ -18,7 +20,7 @@ and check the app is running
 
 `kubectl get all`{{execute}}
 
-The 6 lines of YAML have created for you a `Deployment` and a `Service`, and the `Service` is exposed on port 80 in the cluster. Sample output:
+The 6 lines of YAML have created for you a `Deployment` and a `Service`, and the `Service` is exposed on port 80 in the cluster. Sample output, once the app is running:
 
 ```
 NAME                        READY   STATUS    RESTARTS   AGE

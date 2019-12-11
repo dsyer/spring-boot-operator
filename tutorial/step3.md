@@ -5,9 +5,15 @@ First create a namespace for the database service:
 
 ```
 kubectl create namespace services
-```
+```{{execute}}
 
-then install the database service into the new namespace:
+Then we need to create a `PersistentVolume`:
+
+```
+sudo mkdir /mnt/data && kubectl apply -f samples/mysql/pv.yaml -n services
+```{{execute}}
+
+AT this point we can install the database service into the new namespace:
 
 ```
 kubectl apply -f <(kustomize build samples/mysql)
@@ -41,7 +47,7 @@ kubectl apply -f samples/petclinic.yaml
 
 Now we can connect to the application. First create an SSH tunnel:
 
-`kubectl port-forward svc/demo 8080:80`{{execute T1}}
+`kubectl port-forward svc/demo 8080:80 --address=0.0.0.0`{{execute T1}}
 
 and then you can verify that the app is running:
 
@@ -64,6 +70,6 @@ and then you can verify that the app is running:
 }
 ```
 
-That it! You have an application running in Kubernetes and the database is connected.
+That's it! You have an application running in Kubernetes and the database is connected. You can open the UI in your browser by clicking on the "App" tab next to the "Terminal".
 
 Next we will drill into the Petclinic sample and see how all teh pieces fit together.

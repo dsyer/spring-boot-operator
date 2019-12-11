@@ -11,6 +11,8 @@ spec:
   image: springguides/demo
 ```
 
+You can try it out in an interactive tutorial in https://katacoda.com/springbootoperator/scenarios/tutorial[Katakoda].
+
 == Installation
 
 The controller is in Dockerhub, so you should be able to deploy it from just the YAML:

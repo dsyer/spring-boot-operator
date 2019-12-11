@@ -39,6 +39,7 @@ replicaset.apps/spring-controller-manager-79c6c95677   1         1         1    
 Petclinic:
 
 ```
+$ kubectl create namespace services
 $ kubectl apply -f <(kustomize build github.com/dsyer/spring-boot-operator/config/samples/mysql)
 $ kubectl apply -f <(curl https://raw.githubusercontent.com/dsyer/spring-boot-operator/master/config/samples/petclinic.yaml)
 ```

@@ -14,6 +14,14 @@
         "title": "Deploy the application",
         "text": "step2.md",
         "courseData": "setup.sh"
+      },
+      {
+        "title": "Deploy the Petclinic",
+        "text": "step3.md"
+      },
+      {
+        "title": "Drill into the Petclinic",
+        "text": "step4.md"
       }
     ],
     "intro": {
@@ -25,7 +33,7 @@
     }
   },
   "environment": {
-    "uilayout": "terminal",
+    "uilayout": "editor-terminal",
     "showdashboard": true,
     "dashboards": [{ "name": "App", "port": 8080 }]
   },

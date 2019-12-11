@@ -1,33 +1,31 @@
 
-Quickly create a deployment manifest for a simple application on Kubernetes:
+Quickly inspect the deployment manifest at `samples/demo.yaml`{{open}} for a simple application on Kubernetes. It's only a few lines because with a few opinions baked in, it only really needs to know the image location:
 
 ```
-cat > deployment.yaml << EOF
 apiVersion: spring.io/v1
 kind: Microservice
 metadata:
   name: demo
 spec:
   image: springguides/demo
-EOF
-```{{execute}}
+```
 
 Then deploy to Kubernetes
 
-`kubectl apply -f deployment.yaml`{{execute}}
+`kubectl apply -f samples/demo.yaml`{{execute}}
 
 and check the app is running 
 
 `kubectl get all`{{execute}}
 
-Sample output:
+The 6 lines of YAML have created for you a `Deployment` and a `Service`, and the `Service` is exposed on port 80 in the cluster. Sample output:
 
 ```
 NAME                        READY   STATUS    RESTARTS   AGE
 pod/demo-7b4cfc5767-24qgd   0/1     Running   0          6s
 
 NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
-service/demo         ClusterIP   10.97.182.253   <none>        8080/TCP   7s
+service/demo         ClusterIP   10.97.182.253   <none>        80/TCP   7s
 service/kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP    9m22s
 
 NAME                   READY   UP-TO-DATE   AVAILABLE   AGE
@@ -50,6 +48,12 @@ and then you can verify that the app is running:
 {"status":"UP"}
 ```
 
-That it! You have an application running in Kubernetes.
+That it! You have an application running in Kubernetes. You can inspect the YAML that was generated in the controller, e.g.
 
-`echo "Send Ctrl+C to kill the container"`{{execute T1 interrupt}}
+```
+kubectl get deployment demo -o yaml
+```
+
+Finally, clean up the deployment and tear down the tunnel ready for the next step:
+
+`kubectl delete microservices --all`{{execute T1 interrupt}}

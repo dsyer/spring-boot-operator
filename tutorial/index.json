@@ -1,0 +1,35 @@
+{
+  "title": "A CRD for Spring Boot Apps",
+  "description": "Deploy a Spring Boot application from a container with some opinionated resources.",
+  "difficulty": "Intermediate",
+  "time": "20 minutes",
+  "details": {
+    "steps": [
+      {
+        "title": "Set up the cluster",
+        "text": "step1.md",
+        "code": "demo.sh"
+      },
+      {
+        "title": "Deploy the application",
+        "text": "step2.md",
+        "courseData": "setup.sh"
+      }
+    ],
+    "intro": {
+      "text": "intro.md",
+      "code": "env.sh"
+    },
+    "finish": {
+      "text": "finish.md"
+    }
+  },
+  "environment": {
+    "uilayout": "editor-terminal",
+    "showdashboard": true,
+    "dashboards": [{ "name": "App", "port": 8080 }]
+  },
+  "backend": {
+    "imageid": "kubernetes"
+  }
+}

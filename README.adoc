@@ -186,7 +186,7 @@ spec:
   - mysql
 ```
 
-Each binding is used to search for a `ServiceBinding` of the same name, in the same namespace. If no matching `ServiceBinding` is defined, then a default is provided based on a naming convention.
+Each binding is in the form `[namespace/]<name>` where the name space is optional. It is used to search for a `ServiceBinding` in the namespace specified (or the same namepsace as the `Microservice` if not specified, as in this example). If no matching `ServiceBinding` is defined, then a default is provided based on a naming convention.
 
 === Actuators
 

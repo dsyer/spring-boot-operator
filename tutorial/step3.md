@@ -7,7 +7,7 @@ First create a namespace for the database service:
 kubectl create namespace services
 ```{{execute}}
 
-Then we need to create a `PersistentVolume`:
+Then we need to create a `PersistentVolume` (you wouldn't need this step if the cluster was on [GKE](https://cloud.google.com/kubernetes-engine/) or [Kind](https://github.com/kubernetes-sigs/kind) because they have a default storage class):
 
 ```
 sudo mkdir /mnt/data && kubectl apply -f samples/mysql/pv.yaml -n services

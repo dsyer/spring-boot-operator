@@ -10,7 +10,7 @@ metadata:
 spec:
   image: springguides/demo
 EOF
-```
+```{{execute}}
 
 Then deploy to Kubernetes
 
@@ -40,7 +40,7 @@ master
 
 Now we can connect to the application. First create an SSH tunnel:
 
-`kubectl port-forward svc/demo 8080:8080`{{execute T1}}
+`kubectl port-forward svc/demo 8080:80`{{execute T1}}
 
 and then you can verify that the app is running:
 
@@ -51,3 +51,5 @@ and then you can verify that the app is running:
 ```
 
 That it! You have an application running in Kubernetes.
+
+`echo "Send Ctrl+C to kill the container"`{{execute T1 interrupt}}

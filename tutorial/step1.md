@@ -8,7 +8,10 @@ kubectl apply -f <(kustomize build github.com/dsyer/spring-boot-operator/config/
 One `Service` for the controller is installed into the `spring-system` namespace:
 
 ```
-$ kubectl get all -n spring-system
+kubectl get all -n spring-system
+```{{execute}}
+
+```
 NAME                                             READY   STATUS    RESTARTS   AGE
 pod/spring-controller-manager-79c6c95677-8hf89   2/2     Running   0          3m17s
 

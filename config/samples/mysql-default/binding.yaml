@@ -1,0 +1,43 @@
+apiVersion: spring.io/v1
+kind: ServiceBinding
+metadata:
+  name: mysql
+spec:
+  env:
+  - name: SPRING_CONFIG_LOCATION
+    values:
+    - classpath:/
+    - file:///etc/config/
+  - name: MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS
+    value: always
+  template:
+    spec:
+      initContainers:
+      - name: env
+        image: dsyer/spring-boot-bindings
+        args: ["-f", "/etc/config/application.properties", "/config/bindings"]
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+        - name: mysql-metadata
+          mountPath: /config/bindings/mysql/metadata
+        - name: mysql-secret
+          mountPath: /config/bindings/mysql/secret
+        - name: mysql-metadata
+          mountPath: /config/templates/mysql
+      containers:
+      - name: app
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+      volumes:
+      - name: mysql-metadata
+        configMap:
+          name: mysql-metadata
+      - name: mysql-secret
+        secret:
+          secretName: mysql-secret
+      - name: config
+        emptyDir: {}
+
+

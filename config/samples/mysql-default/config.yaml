@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-metadata
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret

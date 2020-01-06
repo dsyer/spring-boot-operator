@@ -1,0 +1,26 @@
+# Bind to mysql service in a different name space. Apply this and then bind to "mysql" instead of "services/mysql".
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - config.yaml
+  - binding.yaml
+  - service.yaml
+configMapGenerator:
+  - name: mysql-metadata
+    behavior: merge
+    literals:
+      - kind=mysql
+      - provider=dsyer
+      - |
+        tags=database
+        sql
+    files:
+    - application.properties.tmpl
+secretGenerator:
+  - name: mysql-secret
+    behavior: merge
+    literals:
+      - host=mysql
+      - user=root
+      - password=password
+      - database=test

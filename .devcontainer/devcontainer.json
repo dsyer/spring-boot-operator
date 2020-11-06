@@ -16,9 +16,10 @@
 		"--mount", "type=bind,source=${env:HOME}/.kube,target=/home/vscode/.kube",
 		// On the host: kind get kubeconfig --internal > ~/.kube/kind-config-internal
 		"-e", "KUBECONFIG=/home/vscode/.kube/kind-config-internal",
-
-		"--build-args", "DOCKER_GID=`grep docker /etc/group | cut -d : -f 3`"
 	],
+	"build.args" : {
+		"DOCKER_GID": "${localEnv:DOCKER_GID}"
+	},
 
 	// Use 'settings' to set *default* container specific settings.json values on container create. 
 	// You can edit these settings after create using File > Preferences > Settings > Remote.

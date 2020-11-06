@@ -15,7 +15,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-ARG DOCKER_GID=999
+ARG DOCKER_GID=130
 
 # Configure apt, install packages and tools
 RUN apt-get update \

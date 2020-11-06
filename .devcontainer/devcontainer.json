@@ -4,6 +4,7 @@
 	"name": "Go",
 	"dockerFile": "Dockerfile",
 	"runArgs": [
+		// "--name", "spring-boot-operator",
 		// Uncomment the next line to use a non-root user. On Linux, this will prevent
 		// new files getting created as root, but you may need to update the USER_UID
 		// and USER_GID in .devcontainer/Dockerfile to match your user if not 1000.
@@ -20,6 +21,8 @@
 	"build.args" : {
 		"DOCKER_GID": "${localEnv:DOCKER_GID}"
 	},
+
+	"postAttachCommand": "docker network connect kind $(docker ps -l --format='{{.Names}}')",
 
 	// Use 'settings' to set *default* container specific settings.json values on container create. 
 	// You can edit these settings after create using File > Preferences > Settings > Remote.
@@ -39,6 +42,7 @@
 
 	// Add the IDs of extensions you want installed when the container is created in the array below.
 	"extensions": [
-		"ms-vscode.go", "joaompinto.asciidoctor-vscode"
+		"ms-vscode.go", "joaompinto.asciidoctor-vscode",
+		"ms-kubernetes-tools.vscode-kubernetes-tools"
 	]
 }

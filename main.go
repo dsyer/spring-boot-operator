@@ -17,11 +17,15 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	"os"
+	"time"
 
 	api "github.com/dsyer/spring-boot-operator/api/v1"
 	"github.com/dsyer/spring-boot-operator/controllers"
 	"github.com/go-logr/logr"
+	"github.com/vmware-labs/reconciler-runtime/reconcilers"
+	"github.com/vmware-labs/reconciler-runtime/tracker"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,8 +40,9 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme     = runtime.NewScheme()
+	setupLog   = ctrl.Log.WithName("setup")
+	syncPeriod = 10 * time.Hour
 )
 
 func init() {
@@ -51,8 +56,10 @@ func init() {
 
 func main() {
 	var metricsAddr string
+	var probesAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&probesAddr, "probes-addr", ":8081", "The address health probes bind to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
@@ -60,32 +67,53 @@ func main() {
 	ctrl.SetLogger(zap.Logger(true))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		LeaderElection:     enableLeaderElection,
-		Port:               9443,
+		Scheme:                 scheme,
+		MetricsBindAddress:     metricsAddr,
+		HealthProbeBindAddress: probesAddr,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "controller-leader-election-helper-spring",
+		SyncPeriod:             &syncPeriod,
+		Port:                   9443,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.MicroserviceReconciler{
-		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("Microservice"),
-		Scheme:   mgr.GetScheme(),
-		Recorder: createRecorder(ctrl.Log.WithName("controllers").WithName("Microservice"), mgr),
-	}).SetupWithManager(mgr); err != nil {
+	if err = controllers.MicroserviceReconciler(
+		reconcilers.Config{
+			Client:    mgr.GetClient(),
+			APIReader: mgr.GetAPIReader(),
+			Recorder:  mgr.GetEventRecorderFor("Microservice"),
+			Log:       ctrl.Log.WithName("controllers").WithName("Microservice"),
+			Scheme:    mgr.GetScheme(),
+			Tracker:   tracker.New(syncPeriod, ctrl.Log.WithName("controllers").WithName("Microservice").WithName("tracker")),
+		},
+	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Microservice")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
-	if err = (&controllers.ServiceBindingReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ServiceBinding"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	if err = controllers.ServiceBindingReconciler(
+		reconcilers.Config{
+			Client:    mgr.GetClient(),
+			APIReader: mgr.GetAPIReader(),
+			Recorder:  mgr.GetEventRecorderFor("ServiceBinding"),
+			Log:       ctrl.Log.WithName("controllers").WithName("ServiceBinding"),
+			Scheme:    mgr.GetScheme(),
+			Tracker:   tracker.New(syncPeriod, ctrl.Log.WithName("controllers").WithName("ServiceBinding").WithName("tracker")),
+		},
+	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceBinding")
+		os.Exit(1)
+	}
+
+	if err := mgr.AddHealthzCheck("default", func(_ *http.Request) error { return nil }); err != nil {
+		setupLog.Error(err, "unable to create health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("default", func(_ *http.Request) error { return nil }); err != nil {
+		setupLog.Error(err, "unable to create ready check")
 		os.Exit(1)
 	}
 

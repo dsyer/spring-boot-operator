@@ -32,10 +32,11 @@ type MicroserviceSpec struct {
 
 // MicroserviceStatus defines the observed state of Microservice
 type MicroserviceStatus struct {
-	ServiceName string `json:"serviceName,omitempty"`
-	Label       string `json:"label,omitempty"`
-	Running     bool   `json:"running,omitempty"`
-	Complete    bool   `json:"complete,omitempty"`
+	ServiceName        string `json:"serviceName,omitempty"`
+	Label              string `json:"label,omitempty"`
+	Running            bool   `json:"running,omitempty"`
+	Complete           bool   `json:"complete,omitempty"`
+	ObservedGeneration int64  `json:"observedGeneration,omitempty"`
 }
 
 // +kubebuilder:object:root=true

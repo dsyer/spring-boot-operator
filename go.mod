@@ -3,15 +3,19 @@ module github.com/dsyer/spring-boot-operator
 go 1.13
 
 require (
+	github.com/Azure/go-autorest v11.1.2+incompatible // indirect
+	github.com/coreos/bbolt v1.3.1-coreos.6 // indirect
+	github.com/coreos/etcd v3.3.13+incompatible // indirect
 	github.com/go-logr/logr v0.1.0
-	github.com/gogo/protobuf v1.2.1 // indirect
-	github.com/onsi/ginkgo v1.10.1
-	github.com/onsi/gomega v1.7.0
-	github.com/spf13/pflag v1.0.3 // indirect
-	golang.org/x/sys v0.0.0-20190429190828-d89cdac9e872 // indirect
+	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
+	github.com/onsi/ginkgo v1.11.0
+	github.com/onsi/gomega v1.8.1
+	github.com/vmware-labs/reconciler-runtime v0.1.0
 	golang.org/x/text v0.3.2 // indirect
-	k8s.io/api v0.0.0-20190918195907-bd6ac527cfd2
-	k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
-	k8s.io/client-go v0.0.0-20190918200256-06eb1244587a
-	sigs.k8s.io/controller-runtime v0.3.0
+	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 // indirect
+	k8s.io/api v0.17.4
+	k8s.io/apimachinery v0.17.4
+	k8s.io/client-go v0.17.4
+	sigs.k8s.io/controller-runtime v0.5.2
+	sigs.k8s.io/testing_frameworks v0.1.1 // indirect
 )

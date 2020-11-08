@@ -38,6 +38,7 @@
 
 	// Add the IDs of extensions you want installed when the container is created in the array below.
 	"extensions": [
-		"ms-vscode.go", "joaompinto.asciidoctor-vscode"
+		"joaompinto.asciidoctor-vscode", "golang.go",
+		"ms-kubernetes-tools.vscode-kubernetes-tools"
 	]
 }

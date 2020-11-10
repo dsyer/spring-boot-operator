@@ -32,7 +32,7 @@ spec:
               mountPath: /etc/mysql/conf.d
           resources:
               limits:
-                memory: 1024Mi
+                memory: 1536Mi
               requests:
                 memory: 256Mi
       volumes:

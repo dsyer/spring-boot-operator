@@ -23,10 +23,10 @@ RUN if ! [ "${USER_UID}" = "1000" ]; then (groupadd --gid $USER_GID $USERNAME ||
 
 # download kubebuilder
 RUN os=$(go env GOOS) && arch=$(go env GOARCH) && \
-    curl -sL https://go.kubebuilder.io/dl/2.0.1/${os}/${arch} | tar -xz -C /tmp/ \
-    && mv /tmp/kubebuilder_2.0.1_${os}_${arch} /usr/local/kubebuilder
+    curl -sL https://go.kubebuilder.io/dl/2.3.1/${os}/${arch} | tar -xz -C /tmp/ \
+    && mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
 
-ENV PATH /usr/local/kubebuilder/bin:$PATH
+ENV PATH $PATH:/usr/local/kubebuilder/bin
 
 # download kustomize
 RUN opsys=linux && arch=$(go env GOARCH) && curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases |\
@@ -56,5 +56,5 @@ RUN apt-get update \
     && groupadd --gid $DOCKER_GID docker \
     && usermod -aG docker $USERNAME
 
-RUN curl -sSL -o /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl \
+RUN opsys=linux && arch=$(go env GOARCH) && curl -sSL -o /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/${opsys}/${arch}/kubectl \
     && chmod +x /usr/local/bin/kubectl

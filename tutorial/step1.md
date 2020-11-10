@@ -2,7 +2,7 @@
 The controller is in Dockerhub and the CRDs are defined in Github, so you should be able to deploy it from just the YAML:
 
 ```
-kubectl apply -f <(kustomize build github.com/dsyer/spring-boot-operator/config/default)
+kubectl apply -f <(kustomize build github.com/dsyer/spring-boot-operator/config/default?ref=main)
 ```{{execute}}
 
 > TIP: If the command above fails, keep trying: the network environment takes a minute to stabilize sometimes.

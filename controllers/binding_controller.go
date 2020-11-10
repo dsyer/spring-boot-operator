@@ -49,7 +49,7 @@ func BindingDeploymentReconciler(c reconcilers.Config) reconcilers.SubReconciler
 
 	return &reconcilers.SyncReconciler{
 
-		Sync: func(ctx context.Context, binding api.ServiceBinding) error {
+		Sync: func(ctx context.Context, binding *api.ServiceBinding) error {
 			for _, name := range binding.Status.Bound {
 				var micro api.Microservice
 				namespace := binding.Namespace

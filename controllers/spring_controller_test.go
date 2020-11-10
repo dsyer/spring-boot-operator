@@ -16,11 +16,14 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
+	"strings"
+	"testing"
+
 	api "github.com/dsyer/spring-boot-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
-	"testing"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestCreateService(t *testing.T) {
@@ -92,6 +95,179 @@ func TestCreateDeploymentVanilla(t *testing.T) {
 		t.Errorf("Container.LivenessProbe = %s; want 'nil'", container.LivenessProbe)
 	}
 
+}
+
+func defaultBinding(name string, micro api.Microservice) api.ServiceBinding {
+	appContainer := corev1.Container{
+		Name: "app",
+	}
+	binding := api.ServiceBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.ServiceBindingSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{},
+			},
+		},
+	}
+	binding.Namespace = micro.Namespace
+	if name == "actuators" {
+		appContainer.LivenessProbe = &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/actuator/info",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       11,
+		}
+		appContainer.ReadinessProbe = &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/actuator/health",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       13,
+		}
+		binding.Spec.Template.Spec.Containers = []corev1.Container{
+			appContainer,
+		}
+	}
+	binding.Spec.Template.Spec.Volumes = createVolumes(name, micro.Name)
+	location := "/etc/config/"
+	addVolumeMount(&appContainer, location)
+	addEnvVars(&binding.Spec, location)
+	binding.Spec.Template.Spec.Containers = []corev1.Container{
+		appContainer,
+	}
+	initContainer := corev1.Container{
+		Name: "env",
+	}
+	setUpInitContainer(&initContainer, name)
+	binding.Spec.Template.Spec.InitContainers = []corev1.Container{
+		initContainer,
+	}
+	return binding
+}
+
+func setUpInitContainer(container *corev1.Container, binding string) {
+	container.Name = "env"
+	container.Image = "dsyer/spring-boot-bindings"
+	container.Args = []string{
+		"-f", "/etc/config/application.properties", "/config/bindings",
+	}
+	mounts := container.VolumeMounts
+	locator := map[string]corev1.VolumeMount{}
+	for _, volume := range mounts {
+		locator[volume.Name] = volume
+	}
+	if _, ok := locator["config"]; !ok {
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      "config",
+			MountPath: "/etc/config",
+		})
+	}
+	if _, ok := locator[fmt.Sprintf("%s-metadata", binding)]; !ok {
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      fmt.Sprintf("%s-metadata", binding),
+			MountPath: fmt.Sprintf("/config/bindings/%s/metadata", binding),
+		},
+			corev1.VolumeMount{
+				Name:      fmt.Sprintf("%s-secret", binding),
+				MountPath: fmt.Sprintf("/config/bindings/%s/secret", binding),
+			})
+	}
+	container.VolumeMounts = mounts
+}
+
+func addVolumeMount(container *corev1.Container, location string) {
+	mounts := container.VolumeMounts
+	locator := map[string]corev1.VolumeMount{}
+	for _, volume := range mounts {
+		locator[volume.Name] = volume
+	}
+	if _, ok := locator["config"]; !ok {
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      "config",
+			MountPath: location,
+		})
+	}
+	container.VolumeMounts = mounts
+}
+
+func createVolumes(binding string, config string) []corev1.Volume {
+	volumes := []corev1.Volume{}
+	name := fmt.Sprintf("%s-metadata", binding)
+	volumes = append(volumes, corev1.Volume{
+		Name: name,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: name,
+				},
+			},
+		},
+	})
+	volumes = append(volumes, corev1.Volume{
+		Name: fmt.Sprintf("%s-secret", binding),
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: fmt.Sprintf("%s-secret", binding),
+			},
+		},
+	})
+	volumes = append(volumes, corev1.Volume{
+		Name: "config",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	})
+	return volumes
+}
+
+func addEnvVars(spec *api.ServiceBindingSpec, location string) {
+	locations := []string{"classpath:/", "file://" + location}
+	env := spec.Env
+	env = setEnvVars(env, "CNB_BINDINGS", "/config/bindings")
+	env = setEnvVarsMulti(env, "SPRING_CONFIG_LOCATION", locations)
+	spec.Env = env
+}
+
+func setEnvVars(values []api.EnvVar, name string, value string) []api.EnvVar {
+	var env api.EnvVar
+	for _, env = range values {
+		if env.Name == name {
+			env.Value = value
+			break
+		}
+	}
+	if env.Name != name {
+		env.Name = name
+		env.Value = value
+		values = append(values, env)
+	}
+	return values
+}
+
+func setEnvVarsMulti(values []api.EnvVar, name string, value []string) []api.EnvVar {
+	var env api.EnvVar
+	for _, env = range values {
+		if env.Name == name {
+			env.Values = unique(append(env.Values, value...))
+			break
+		}
+	}
+	if env.Name != name {
+		env.Name = name
+		env.Values = value
+		env.Value = ""
+		values = append(values, env)
+	}
+	return values
 }
 
 func TestCreateDeploymentActuators(t *testing.T) {
@@ -209,7 +385,10 @@ func TestCreateDeploymentBindings(t *testing.T) {
 			Bindings: []string{"mysql", "redis"},
 		},
 	}
-	deployment := createDeployment(findBindingsToApply(micro, map[string]api.ServiceBinding{}), &micro)
+	bindingMap := map[string]api.ServiceBinding{}
+	bindingMap["mysql"] = defaultBinding("mysql", micro)
+	bindingMap["redis"] = defaultBinding("redis", micro)
+	deployment := createDeployment(findBindingsToApply(micro, bindingMap), &micro)
 	if len(deployment.Spec.Template.Spec.Volumes) != 5 {
 		t.Errorf("len(container.VolumeMounts) = %d; want 5", len(deployment.Spec.Template.Spec.Volumes))
 		t.FailNow()

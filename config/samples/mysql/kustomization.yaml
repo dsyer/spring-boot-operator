@@ -19,6 +19,10 @@ configMapGenerator:
         sql
     files:
     - application.properties.tmpl
+  - name: mysql-config
+    behavior: merge
+    files:
+    - mysql.cnf
 secretGenerator:
   - name: mysql-secret
     behavior: merge

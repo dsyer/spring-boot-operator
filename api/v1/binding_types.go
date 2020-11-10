@@ -35,7 +35,8 @@ type ServiceBindingSpec struct {
 
 // ServiceBindingStatus defines the observed state of ServiceBinding
 type ServiceBindingStatus struct {
-	Bound []string `json:"bound,omitempty"`
+	Bound              []string `json:"bound,omitempty"`
+	ObservedGeneration int64    `json:"observedGeneration,omitempty"`
 }
 
 // +kubebuilder:object:root=true

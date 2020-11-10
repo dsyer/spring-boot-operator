@@ -16,15 +16,20 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/vmware-labs/reconciler-runtime/reconcilers"
+	"github.com/vmware-labs/reconciler-runtime/tracker"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	api "github.com/dsyer/spring-boot-operator/api/v1"
 )
@@ -53,11 +58,166 @@ func MicroserviceReconciler(c reconcilers.Config) *reconcilers.ParentReconciler 
 	return &reconcilers.ParentReconciler{
 		Type: &api.Microservice{},
 		SubReconcilers: []reconcilers.SubReconciler{
+			DeploymentBindingReconciler(c),
 			DeploymentReconciler(c),
 			ServiceReconciler(c),
 		},
 
 		Config: c,
+	}
+}
+
+// DeploymentBindingReconciler creates a new Deployment if needed
+func DeploymentBindingReconciler(c reconcilers.Config) reconcilers.SubReconciler {
+	c.Log = c.Log.WithName("DeploymentBinding")
+	r := ContextReconciler{}
+	config := ConfigMapReconciler(c, &r)
+	secret := SecretReconciler(c, &r)
+	return &reconcilers.SyncReconciler{
+
+		Sync: func(ctx context.Context, micro *api.Microservice) error {
+			bindingsToApply := findBindings(c, micro)
+			for _, binding := range bindingsToApply {
+				r.resetConfig()
+				if binding.Namespace == micro.Namespace {
+					continue
+				}
+				for _, volume := range binding.Spec.Template.Spec.Volumes {
+					if volume.ConfigMap != nil {
+						sourceName := volume.ConfigMap.Name
+						var configMap corev1.ConfigMap
+						if err := c.Get(ctx, client.ObjectKey{
+							Namespace: micro.Namespace,
+							Name:      sourceName,
+						}, &configMap); err != nil {
+							if err := c.Get(ctx, client.ObjectKey{
+								Namespace: binding.Namespace,
+								Name:      sourceName,
+							}, &configMap); err != nil {
+								c.Log.Info("Unable to obtain source ConfigMap", "namespace", binding.Namespace, "configmap", sourceName)
+								continue
+							}
+							target := configMap.DeepCopy()
+							target.ResourceVersion = ""
+							target.Annotations["spring.io/servicebinding"] = fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)
+							target.Namespace = micro.Namespace
+							target.Name = fmt.Sprintf("%s-%s", micro.Name, volume.ConfigMap.Name)
+							r.config = *target
+							config.Reconcile(ctx, micro)
+						}
+					}
+					if volume.Secret != nil {
+						sourceName := volume.Secret.SecretName
+						var source corev1.Secret
+						if err := c.Get(ctx, client.ObjectKey{
+							Namespace: micro.Namespace,
+							Name:      sourceName,
+						}, &source); err != nil {
+							if err := c.Get(ctx, client.ObjectKey{
+								Namespace: binding.Namespace,
+								Name:      sourceName,
+							}, &source); err != nil {
+								c.Log.Info("Unable to obtain source Secret", "namespace", binding.Namespace, "secret", sourceName)
+								continue
+							}
+							target := source.DeepCopy()
+							target.ResourceVersion = ""
+							target.Annotations["spring.io/servicebinding"] = fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)
+							target.Namespace = micro.Namespace
+							target.Name = fmt.Sprintf("%s-%s", micro.Name, volume.Secret.SecretName)
+							r.secret = *target
+							secret.Reconcile(ctx, micro)
+						}
+					}
+				}
+			}
+			return nil
+		},
+
+		Config: c,
+
+		Setup: func(mgr reconcilers.Manager, bldr *reconcilers.Builder) error {
+			config.SetupWithManager(mgr, bldr)
+			secret.SetupWithManager(mgr, bldr)
+			return nil
+		},
+	}
+}
+
+// ContextReconciler like a ChildReconciler but with context
+type ContextReconciler struct {
+	config corev1.ConfigMap
+	secret corev1.Secret
+}
+
+func (c *ContextReconciler) resetConfig() {
+	c.secret = corev1.Secret{}
+	c.config = corev1.ConfigMap{}
+}
+
+// ConfigMapReconciler creates a new ConfigMap if needed
+func ConfigMapReconciler(c reconcilers.Config, r *ContextReconciler) reconcilers.SubReconciler {
+	c.Log = c.Log.WithName("ConfigMap")
+	return &reconcilers.ChildReconciler{
+		Config:        c,
+		ParentType:    &api.Microservice{},
+		ChildType:     &corev1.ConfigMap{},
+		ChildListType: &corev1.ConfigMapList{},
+
+		DesiredChild: func(micro *api.Microservice) (*corev1.ConfigMap, error) {
+			return &r.config, nil
+		},
+
+		ReflectChildStatusOnParent: func(micro *api.Microservice, child *corev1.ConfigMap, err error) {
+			return
+		},
+
+		MergeBeforeUpdate: func(current, desired *corev1.ConfigMap) {
+			current.Labels = desired.Labels
+		},
+
+		SemanticEquals: func(a1, a2 *corev1.ConfigMap) bool {
+			return equality.Semantic.DeepEqual(a1.Labels, a2.Labels) && equality.Semantic.DeepEqual(a1.Data, a2.Data)
+		},
+
+		IndexField: ".metadata.serviceBindingConfigMap",
+
+		Sanitize: func(child *corev1.ConfigMap) interface{} {
+			return child.Data
+		},
+	}
+}
+
+// SecretReconciler creates a new ConfigMap if needed
+func SecretReconciler(c reconcilers.Config, r *ContextReconciler) reconcilers.SubReconciler {
+	c.Log = c.Log.WithName("ConfigMap")
+	return &reconcilers.ChildReconciler{
+		Config:        c,
+		ParentType:    &api.Microservice{},
+		ChildType:     &corev1.Secret{},
+		ChildListType: &corev1.SecretList{},
+
+		DesiredChild: func(micro *api.Microservice) (*corev1.Secret, error) {
+			return &r.secret, nil
+		},
+
+		ReflectChildStatusOnParent: func(micro *api.Microservice, child *corev1.Secret, err error) {
+			return
+		},
+
+		MergeBeforeUpdate: func(current, desired *corev1.Secret) {
+			current.Labels = desired.Labels
+		},
+
+		SemanticEquals: func(a1, a2 *corev1.Secret) bool {
+			return equality.Semantic.DeepEqual(a1.Labels, a2.Labels) && equality.Semantic.DeepEqual(a1.Data, a2.Data)
+		},
+
+		IndexField: ".metadata.serviceBindingSecretp",
+
+		Sanitize: func(child *corev1.Secret) interface{} {
+			return child.Data
+		},
 	}
 }
 
@@ -72,7 +232,10 @@ func DeploymentReconciler(c reconcilers.Config) reconcilers.SubReconciler {
 		ChildListType: &apps.DeploymentList{},
 
 		DesiredChild: func(micro *api.Microservice) (*apps.Deployment, error) {
-			return createDeployment([]api.ServiceBinding{}, micro), nil
+			bindingsToApply := findBindings(c, micro)
+			trackBindings(c, bindingsToApply)
+			updatedBindings := updateBindings(c, micro, bindingsToApply)
+			return createDeployment(updatedBindings, micro), nil
 		},
 
 		ReflectChildStatusOnParent: func(micro *api.Microservice, child *apps.Deployment, err error) {
@@ -100,6 +263,11 @@ func DeploymentReconciler(c reconcilers.Config) reconcilers.SubReconciler {
 
 		Sanitize: func(child *apps.Deployment) interface{} {
 			return child.Spec
+		},
+
+		Setup: func(mgr reconcilers.Manager, bldr *reconcilers.Builder) error {
+			bldr.Watches(&source.Kind{Type: &api.ServiceBinding{}}, reconcilers.EnqueueTracked(&api.ServiceBinding{}, c.Tracker, c.Scheme))
+			return nil
 		},
 	}
 }
@@ -189,7 +357,8 @@ func createDeployment(bindings []api.ServiceBinding, micro *api.Microservice) *a
 	return deployment
 }
 
-func updatePodTemplate(template *corev1.PodTemplateSpec, bindings []api.ServiceBinding, micro *api.Microservice) *corev1.PodTemplateSpec {
+func updatePodTemplate(template *corev1.PodTemplateSpec, bindings []api.ServiceBinding, source *api.Microservice) *corev1.PodTemplateSpec {
+	micro := source.DeepCopy()
 	defaults := findAppContainer(&micro.Spec.Template.Spec)
 	if len(micro.Spec.Template.Spec.Containers) == 1 && defaults.Name == "" {
 		// If there is only one container and it is anonymous, then it is the app container
@@ -304,39 +473,6 @@ func setEnvVar(values []corev1.EnvVar, name string, value string) []corev1.EnvVa
 	return values
 }
 
-func setEnvVars(values []api.EnvVar, name string, value string) []api.EnvVar {
-	var env api.EnvVar
-	for _, env = range values {
-		if env.Name == name {
-			env.Value = value
-			break
-		}
-	}
-	if env.Name != name {
-		env.Name = name
-		env.Value = value
-		values = append(values, env)
-	}
-	return values
-}
-
-func setEnvVarsMulti(values []api.EnvVar, name string, value []string) []api.EnvVar {
-	var env api.EnvVar
-	for _, env = range values {
-		if env.Name == name {
-			env.Values = unique(append(env.Values, value...))
-			break
-		}
-	}
-	if env.Name != name {
-		env.Name = name
-		env.Values = value
-		env.Value = ""
-		values = append(values, env)
-	}
-	return values
-}
-
 func unique(values []string) []string {
 	sifted := map[string]bool{}
 	result := []string{}
@@ -350,156 +486,69 @@ func unique(values []string) []string {
 	return result
 }
 
-func addVolumeMount(container *corev1.Container, location string) {
-	mounts := container.VolumeMounts
-	locator := map[string]corev1.VolumeMount{}
-	for _, volume := range mounts {
-		locator[volume.Name] = volume
-	}
-	if _, ok := locator["config"]; !ok {
-		mounts = append(mounts, corev1.VolumeMount{
-			Name:      "config",
-			MountPath: location,
-		})
-	}
-	container.VolumeMounts = mounts
-}
-
-func createVolumes(binding string, config string) []corev1.Volume {
-	volumes := []corev1.Volume{}
-	name := fmt.Sprintf("%s-metadata", binding)
-	volumes = append(volumes, corev1.Volume{
-		Name: name,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: name,
-				},
-			},
-		},
-	})
-	volumes = append(volumes, corev1.Volume{
-		Name: fmt.Sprintf("%s-secret", binding),
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: fmt.Sprintf("%s-secret", binding),
-			},
-		},
-	})
-	volumes = append(volumes, corev1.Volume{
-		Name: "config",
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
-	})
-	return volumes
-}
-
-func defaultBinding(name string, micro api.Microservice) api.ServiceBinding {
-	appContainer := corev1.Container{
-		Name: "app",
-	}
-	binding := api.ServiceBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: api.ServiceBindingSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{},
-			},
-		},
-	}
-	binding.Namespace = micro.Namespace
-	if name == "actuators" {
-		appContainer.LivenessProbe = &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/actuator/info",
-					Port: intstr.FromInt(8080),
-				},
-			},
-			InitialDelaySeconds: 30,
-			PeriodSeconds:       11,
-		}
-		appContainer.ReadinessProbe = &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/actuator/health",
-					Port: intstr.FromInt(8080),
-				},
-			},
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       13,
-		}
-		binding.Spec.Template.Spec.Containers = []corev1.Container{
-			appContainer,
-		}
-		return binding
-	}
-	binding.Spec.Template.Spec.Volumes = createVolumes(name, micro.Name)
-	location := "/etc/config/"
-	addVolumeMount(&appContainer, location)
-	addEnvVars(&binding.Spec, location)
-	binding.Spec.Template.Spec.Containers = []corev1.Container{
-		appContainer,
-	}
-	initContainer := corev1.Container{
-		Name: "env",
-	}
-	setUpInitContainer(&initContainer, name)
-	binding.Spec.Template.Spec.InitContainers = []corev1.Container{
-		initContainer,
-	}
-	return binding
-}
-
-func addEnvVars(spec *api.ServiceBindingSpec, location string) {
-	locations := []string{"classpath:/", "file://" + location}
-	env := spec.Env
-	env = setEnvVars(env, "CNB_BINDINGS", "/config/bindings")
-	env = setEnvVarsMulti(env, "SPRING_CONFIG_LOCATION", locations)
-	spec.Env = env
-}
-
-// Set up the init container, setting the image, adding volumes etc.
-func setUpInitContainer(container *corev1.Container, binding string) {
-	container.Name = "env"
-	container.Image = "dsyer/spring-boot-bindings"
-	container.Args = []string{
-		"-f", "/etc/config/application.properties", "/config/bindings",
-	}
-	mounts := container.VolumeMounts
-	locator := map[string]corev1.VolumeMount{}
-	for _, volume := range mounts {
-		locator[volume.Name] = volume
-	}
-	if _, ok := locator["config"]; !ok {
-		mounts = append(mounts, corev1.VolumeMount{
-			Name:      "config",
-			MountPath: "/etc/config",
-		})
-	}
-	if _, ok := locator[fmt.Sprintf("%s-metadata", binding)]; !ok {
-		mounts = append(mounts, corev1.VolumeMount{
-			Name:      fmt.Sprintf("%s-metadata", binding),
-			MountPath: fmt.Sprintf("/config/bindings/%s/metadata", binding),
-		},
-			corev1.VolumeMount{
-				Name:      fmt.Sprintf("%s-secret", binding),
-				MountPath: fmt.Sprintf("/config/bindings/%s/secret", binding),
-			})
-	}
-	container.VolumeMounts = mounts
-}
-
 func findBindingsToApply(micro api.Microservice, bindingsMap map[string]api.ServiceBinding) []api.ServiceBinding {
 	var bindingsToApply = []api.ServiceBinding{}
 	for _, name := range micro.Spec.Bindings {
 		if binding, ok := bindingsMap[name]; ok {
 			bindingsToApply = append(bindingsToApply, binding)
-		} else {
-			bindingsToApply = append(bindingsToApply, defaultBinding(name, micro))
 		}
+	}
+	return bindingsToApply
+}
+
+func trackBindings(c reconcilers.Config, bindingsToApply []api.ServiceBinding) {
+	for _, binding := range bindingsToApply {
+		key := types.NamespacedName{
+			Namespace: binding.Namespace,
+			Name:      binding.Name,
+		}
+		c.Tracker.Track(
+			tracker.NewKey(corev1.SchemeGroupVersion.WithKind("ServiceBinding"), key),
+			types.NamespacedName{Namespace: binding.Namespace, Name: binding.Name},
+		)
+	}
+}
+
+func findBindings(c reconcilers.Config, micro *api.Microservice) []api.ServiceBinding {
+	var bindingsToApply []api.ServiceBinding
+	if len(micro.Spec.Bindings) > 0 {
+		ctx := context.Background()
+		var bindings api.ServiceBindingList
+		if err := c.List(ctx, &bindings, &client.ListOptions{Namespace: corev1.NamespaceAll}); err != nil {
+			c.Log.Error(err, "Unable to list Bindings")
+			// Not fatal
+		}
+		bindingsMap := map[string]api.ServiceBinding{}
+		for _, binding := range bindings.Items {
+			bindingsMap[fmt.Sprintf("%s/%s", binding.Namespace, binding.Name)] = binding
+			if binding.Namespace == micro.Namespace {
+				bindingsMap[binding.Name] = binding
+			}
+		}
+		bindingsToApply = findBindingsToApply(*micro, bindingsMap)
+	}
+	return bindingsToApply
+}
+
+func updateBindings(c reconcilers.Config, micro *api.Microservice, bindings []api.ServiceBinding) []api.ServiceBinding {
+	if len(bindings) == 0 {
+		return bindings
+	}
+	var bindingsToApply = []api.ServiceBinding{}
+	for _, binding := range bindings {
+		bindingToApply := binding
+		if binding.Namespace != micro.Namespace {
+			bindingToApply = *bindingToApply.DeepCopy()
+			for _, volume := range bindingToApply.Spec.Template.Spec.Volumes {
+				if volume.ConfigMap != nil {
+					volume.ConfigMap.Name = fmt.Sprintf("%s-%s", micro.Name, volume.ConfigMap.Name)
+				}
+				if volume.Secret != nil {
+					volume.Secret.SecretName = fmt.Sprintf("%s-%s", micro.Name, volume.Secret.SecretName)
+				}
+			}
+		}
+		bindingsToApply = append(bindingsToApply, bindingToApply)
 	}
 	return bindingsToApply
 }

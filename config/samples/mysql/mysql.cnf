@@ -1,0 +1,7 @@
+[mysqld]
+key_buffer              = 8M 
+max_connections         = 30 # Limit connections
+query_cache_size        = 8M # try 4m if not enough 
+query_cache_limit       = 512K
+thread_stack            = 128K
+performance_schema      = 0

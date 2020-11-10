@@ -28,11 +28,20 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/mysql
+            - name: config
+              mountPath: /etc/mysql/conf.d
+          resources:
+              limits:
+                memory: 1024Mi
+              requests:
+                memory: 256Mi
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: mysql
-
+        - name: config
+          configMap:
+              name: mysql-config
 ---
 
 apiVersion: v1

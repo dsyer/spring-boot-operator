@@ -174,6 +174,7 @@ func ConfigMapReconciler(c reconcilers.Config, r *ContextReconciler) reconcilers
 
 		MergeBeforeUpdate: func(current, desired *corev1.ConfigMap) {
 			current.Labels = desired.Labels
+			current.Data = desired.Data
 		},
 
 		SemanticEquals: func(a1, a2 *corev1.ConfigMap) bool {
@@ -207,6 +208,7 @@ func SecretReconciler(c reconcilers.Config, r *ContextReconciler) reconcilers.Su
 
 		MergeBeforeUpdate: func(current, desired *corev1.Secret) {
 			current.Labels = desired.Labels
+			current.Data = desired.Data
 		},
 
 		SemanticEquals: func(a1, a2 *corev1.Secret) bool {
